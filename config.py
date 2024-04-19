@@ -37,6 +37,17 @@ from gpiozero import *
 Device_SPI = 1
 Device_I2C = 0
 
+#Speedometer Calibration 
+Stock_Ratio = 4.083
+New_Ratio = 4.636 
+Stock_Tire_Height = 24.9
+New_Tire_Height = 25.1 #
+Combined_Ratio = (New_Ratio/Stock_Ratio) * (New_Tire_Height/Stock_Tire_Height)
+
+Units_MPH = 1 #set to 0 for kph
+Units_Farenheight = 1 #set to 0 for celcius
+
+
 class RaspberryPi:
     def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=10000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
         self.INPUT = False
@@ -95,5 +106,11 @@ class RaspberryPi:
             self.bus.close()
         self.digital_write(self.RST_PIN,False)
         self.digital_write(self.DC_PIN,False)
+
+    # def Units():
+    #     if Units_MPH == 1: #convert from kph to mph
+        
+    #     if Units_Farenheight == 1:
+            
 
 ### END OF FILE ###

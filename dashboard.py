@@ -1,34 +1,7 @@
-#!/usr/bin/python
-# dashboard.py
-
-#Copyright (C) 2014 Eilidh Fridlington http://eilidh.fridlington.com
-
-#This program is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
-
-#This program is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
-
-#You should have received a copy of the GNU General Public License
-#along with this program.  If not, see <http://www.gnu.org/licenses/>
-
-
-
-
-
-
-
 import sys
 import os
-#import pygame
 import time
 import math
-#from pygame.locals import *
-#import pygame.gfxdraw
 import serial
 import threading
 import datetime
@@ -37,19 +10,20 @@ import OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button
 
-#os.environ['SDL_VIDEO_WINDOW_POS'] = 'center'
+# OLED screen info
+Device_SPI = config.Device_SPI
+Device_I2C = config.Device_I2C
+OLED_WIDTH   = 128
+OLED_HEIGHT  = 64
+font1 = ImageFont.truetype('Font.ttc', 18)
+font2 = ImageFont.truetype('Font.ttc', 24)
 
-OLED_WIDTH   = 128 #OLED width #there is also a duplicate of this further down, can probably remove one of them
-OLED_HEIGHT  = 64  #OLED height
-
+# Button configs
 ModeButton = Button(2) #switch modes using a button attached to GPIO Pin 2
 PeakButton = Button(3) #show peak values using a button attached to GPIO Pin 3
 
-#pygame.init()
-# picdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'pic')
-# print(picdir)
-font1 = ImageFont.truetype('Font.ttc', 18)
-font2 = ImageFont.truetype('Font.ttc', 24)
+
+
 def writetext(upper,lower):
     image = Image.new('1', (128, 64), 255)
     draw = ImageDraw.Draw(image)
@@ -70,7 +44,6 @@ def portconnect():
             print('Port is not none')
             if PORT.is_open:  # Check if PORT is not None and is open
                 print('Port is open')
-                # writetext('Port open')
         else:
             if PORT:
                 PORT.open()  # port is not none but is closed
@@ -80,15 +53,6 @@ while PORT is None:
     portconnect()
     time.sleep(1)
     print('PORT = None')
-    #writetext('PORT=None')
-# portconnect()
-
-# if PORT is not None:
-#     pass
-# else:
-#     #writetext('PORT=None')
-#     print('PORT = None')
-#     #portconnect()
 
 ########################################################################
 class ReadStream(threading.Thread):
@@ -96,14 +60,14 @@ class ReadStream(threading.Thread):
     def __init__(self, daemon):
         threading.Thread.__init__(self)
         self.daemon = daemon
-        self.MPH_Value = 0
-        self. RPM_Value = 0
-        self. TEMP_Value = 0
-        self. BATT_Value = 0
-        self. MAF_Value = 0
-        self. AAC_Value = 0
-        self. INJ_Value = 0
-        self. TIM_Value = 0
+        self.SPEED_Value = 0
+        self.RPM_Value = 0
+        self.TEMP_Value = 0
+        self.BATT_Value = 0
+        self.MAF_Value = 0
+        self.AAC_Value = 0
+        self.INJ_Value = 0
+        self.TIM_Value = 0
         
         read_Thread = True;
         self.Header = 255
@@ -117,10 +81,6 @@ class ReadStream(threading.Thread):
         Header = 255
         returnBytes = 14
         try:
-            # if dataList[-4] != self.Header:
-            #     return False
-            # if dataList[-3] != self.returnBytes:
-            #         return False   
             if data_list[-4] != Header:
                 return False
             if data_list[-3] != returnBytes:
@@ -131,39 +91,23 @@ class ReadStream(threading.Thread):
         return True
                 
     def consume_data(self):
-        global MPH_Value, RPM_Value, TEMP_Value, BATT_Value, MAF_Value, AAC_Value, INJ_Value, TIM_Value
+        global SPEED_Value, RPM_Value, TEMP_Value, BATT_Value, MAF_Value, AAC_Value, INJ_Value, TIM_Value
         read_thread = True
         while read_thread:
             incomingData = PORT.read(16)
-            #incomingData = str(incomingData)
-            #print('incomingData',incomingData)
             if incomingData:
                 dataList = list(incomingData)
-                #dataList = map(ord,incomingData)
-                #dataList = list(dataList)
-                
-                #print('datalist',list(dataList))
-                #print('typedatalist',type(list(dataList)))
-                #print('datalistzero',list(dataList)[0])
 
-            if not self.check_data_size(dataList): ##BROKEN!!! FIX ME
-                continue
+            # if not self.check_data_size(dataList): ##BROKEN!!! FIX ME
+            #     continue
                 
             try:
-                MPH_Value = self.convertToMPH(int(dataList[-2]))
+                SPEED_Value = self.convertToSpeed(int(dataList[-2]))
                 RPM_Value = self.convertToRev(int(dataList[-1]))
                 TEMP_Value = self.convertToTemp(int(dataList[0]))
                 BATT_Value = self.convertToBattery(float(dataList[1]))
                 MAF_Value = self.convertToMAF(int(dataList[5]))
                 AAC_Value = self.convertToAAC(int(dataList[8]))
-
-
-                # print('mph',MPH_Value)
-                # print('rpm',RPM_Value)
-                # print('temp',TEMP_Value)
-                # print('batt',BATT_Value)   
-                # print('aac',AAC_Value)
-                # print('maf',MAF_Value)
                   
             except (ValueError, IndexError):
                    pass         
@@ -176,14 +120,26 @@ class ReadStream(threading.Thread):
         #cant think of  a reason for declerations and initialisations to be seperate
         self.consume_data() 
     
-    def convertToMPH(self,inputData):
-        return int(round ((inputData * 2.11) * 0.621371192237334)) #add a toggle for changing this to kph?
+    if config.Units_MPH == 1:
+        Speed_Units = 'MPH'
+        def convertToSpeed(self,inputData):
+            return int(round((inputData * 2.11) * 0.621371192237334 * config.Combined_Ratio))
+    else:
+        Speed_Units = 'KPH'
+        def convertToSpeed(self,inputData):
+            return int(round((inputData * 2.11)*config.Combined_Ratio))
+        
+    if config.Units_Farenheight == 1:
+        Temp_Units = 'F'
+        def convertToTemp(self,inputData):
+            return (inputData - 50) * 9/5 + 32
+    else:
+        Temp_Units = 'C'
+        def convertToTemp(self,inputData):
+            return inputData - 50
 
     def convertToRev(self,inputData):
         return int(round((inputData * 12.5),2))
-
-    def convertToTemp(self,inputData): #add a toggle for changing this to farenheight? 
-        return inputData - 50
 
     def convertToBattery(self,inputData):
         return round(((inputData * 80) / 1000),1)
@@ -205,7 +161,7 @@ class ReadStream(threading.Thread):
             logFile.write(data)
 
 READ_THREAD = False
-MPH_Value = 0
+SPEED_Value = 0
 RPM_Value = 0
 TEMP_Value = 0
 BATT_Value = 0
@@ -215,14 +171,6 @@ Count = 0
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
-# Device_SPI = config.Device_SPI
-# Device_I2C = config.Device_I2C
-
-Device_SPI = 1 #might be able to get rid of these since i fixed config.py reference? needs testing
-Device_I2C = 0
-
-OLED_WIDTH   = 128 #OLED width
-OLED_HEIGHT  = 64  #OLED height
     
 while READ_THREAD == False:
     try:
@@ -269,7 +217,8 @@ def Increment_Mode():
         Count = 0
     #may need to add a sleep here so it doesn't register multiple presses
     #however I don't know if this will mess things up and cause a delay in serial readings
-DisplayText = ['MPH','RPM','MAF','AAC','TEMP','BATT'] #moved this outside so it's not set every loop
+DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] #moved this outside so it's not set every loop
+Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
 PeakValues = [0,0,0,0,0,0]
 
 def Show_Peak():
@@ -277,98 +226,19 @@ def Show_Peak():
     writetext(PeakValues[Count]) #Modify writetext to allow for writing to the upper right or something for peak value
 
 while READ_THREAD == True:
-    DisplayValue = [MPH_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
-    # for i in range(len(DisplayValue)):
-    #     if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-    #         PeakValues[Count] = DisplayValue[Count]
+    #might be a more efficient way to do this, so we're not copying the values every loop
+    #maybe a list of names that points to the value or something? 
+    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
+    
+    for i in range(len(DisplayValue)):
+        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
+            PeakValues[Count] = DisplayValue[Count]
 
     writetext(DisplayText[Count],DisplayValue[Count])
 
     ModeButton.when_pressed = Increment_Mode
-    # PeakButton.while_pressed = Show_Peak
-    # if ModeButton.is_pressed:
-    #     Count += 1
-    #     if Count > 5:
-    #         Count = 0
-    # #print('READ_THREAD true')
-    # print('BATT_Value',BATT_Value) #this is not updating for some reason
-    # writetext('RPM',RPM_Value)
+    PeakButton.while_pressed = Show_Peak
 
+    writetext(DisplayText[Count],str(DisplayValue[Count]) + Units[Count]) # Not sure if adding the strings here will actually work, needs testing 
+    #ideally long term i should rewrite this so that only the value updates. There's no need to redraw the title and units every loop
     time.sleep(0.02)
-
-    
-# while READ_THREAD == True:
-
-#     pygame.time.Clock().tick(60)
-
-#     for event in pygame.event.get():
-
-#         if event.type==pygame.QUIT:
-#             PORT.flushInput()
-#             PORT.close()
-#             sys.exit()
-
-#         if event.type is KEYDOWN and event.key == K_q:
-#             PORT.flushInput()
-#             PORT.close()
-#             sys.exit()
-
-#         if event.type is KEYDOWN and event.key == K_w:
-#             pygame.display.set_mode((width,height))
-#             pygame.mouse.set_visible(False)
-#             surface1X = surface1WindowedX
-#             surface1Y = surface1WindowedY
-#             surface2X = surface2WindowedX
-#             surface2Y = surface2WindowedY
-#             surface3X = surface3WindowedX
-#             surface3Y = surface3WindowedY
-#             surface4X = surface4WindowedX
-#             surface4Y = surface4WindowedY
-#             surface5X = surface5WindowedX
-#             surface5Y = surface5WindowedY
-#             surface6X = surface6WindowedX
-#             surface6Y = surface6WindowedY
-#             screen.fill(0x000000)
-
-#         if event.type is KEYDOWN and event.key == K_f:
-#             pygame.display.set_mode((monitorX,monitorY), FULLSCREEN)
-#             surface1X = surface1FullscreenX
-#             surface1Y = surface1FullscreenY
-#             surface2X = surface2FullscreenX
-#             surface2Y = surface2FullscreenY
-#             surface3X = surface3FullscreenX
-#             surface3Y = surface3FullscreenY
-#             surface4X = surface4FullscreenX
-#             surface4Y = surface4FullscreenY
-#             surface5X = surface5FullscreenX
-#             surface5Y = surface5FullscreenY
-#             surface6X = surface6FullscreenX
-#             surface6Y = surface6FullscreenY
-#             screen.fill(0x000000)
-#             pygame.mouse.set_visible(False)
-
-#     surface1.fill(0x000000)
-#     surface2.fill(0x0000FF)
-#     surface3.fill(0x0000FF)
-#     surface4.fill(0x0000FF)
-#     surface5.fill(0x0000FF)
-#     surface6.fill(0x0000FF)
-
-#     indicatorNeedle(surface1,MPH_Value,648,650,650,sixty,BLACK,0,0,10,12,6,1,False,False)
-#     indicatorNeedle(surface2,RPM_Value,488,500,500,sixty,BLACK,0,0,500,10,5,100,False,False)
-#     indicatorNeedle(surface3,MAF_Value,168,170,170,twenty,BLACK,-45,-45,50,6,3,10,True,False,"MAF",millivolt)
-#     indicatorNeedle(surface4,AAC_Value,168,170,170,twenty,BLACK,45,45,10,6,3,1,True,False,"AAC",percent)
-#     indicatorNeedle(surface5,TEMP_Value,148,150,150,twenty,BLACK,-45,45,16,6,3,1,True,False,"Temperature",degree)
-#     indicatorNeedle(surface6,BATT_Value,148,150,150,twenty,BLACK,-45,45,2,6,3,1,True,False,"Battery",volt)
-
-
-#     screen.blit(surface1,(surface1X,surface1Y))
-#     screen.blit(surface2,(surface2X,surface2Y))
-#     screen.blit(surface3,(surface3X,surface3Y))
-#     screen.blit(surface4,(surface4X,surface4Y))
-#     screen.blit(surface5,(surface5X,surface5Y))
-#     screen.blit(surface6,(surface6X,surface6Y))
-
-#     #time.sleep(0.02)
-
-#     pygame.display.update()
