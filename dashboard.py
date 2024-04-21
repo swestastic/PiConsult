@@ -19,8 +19,8 @@ font1 = ImageFont.truetype('Font.ttc', 18)
 font2 = ImageFont.truetype('Font.ttc', 24)
 
 # Button configs
-ModeButton = Button(2) #switch modes using a button attached to GPIO Pin 2
-PeakButton = Button(3) #show peak values using a button attached to GPIO Pin 3
+ModeButton = Button(6) #switch modes using a button attached to GPIO Pin 2
+PeakButton = Button(16) #show peak values using a button attached to GPIO Pin 3
 
 
 
@@ -49,10 +49,13 @@ def portconnect():
                 PORT.open()  # port is not none but is closed
             else:
                 print('Failed to initialize PORT')  # Handle the case where PORT is still None
+disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
+disp.Init()
 while PORT is None:
     portconnect()
     time.sleep(1)
     print('PORT = None')
+    writetext('port','port')
 
 ########################################################################
 class ReadStream(threading.Thread):
@@ -121,20 +124,20 @@ class ReadStream(threading.Thread):
         self.consume_data() 
     
     if config.Units_MPH == 1:
-        Speed_Units = 'MPH'
+        #Speed_Units = 'MPH'
         def convertToSpeed(self,inputData):
             return int(round((inputData * 2.11) * 0.621371192237334 * config.Combined_Ratio))
     else:
-        Speed_Units = 'KPH'
+        #Speed_Units = 'KPH'
         def convertToSpeed(self,inputData):
             return int(round((inputData * 2.11)*config.Combined_Ratio))
         
     if config.Units_Farenheight == 1:
-        Temp_Units = 'F'
+        #Temp_Units = 'F'
         def convertToTemp(self,inputData):
             return (inputData - 50) * 9/5 + 32
     else:
-        Temp_Units = 'C'
+        #Temp_Units = 'C'
         def convertToTemp(self,inputData):
             return inputData - 50
 
@@ -169,8 +172,8 @@ AAC_Value = 0
 MAF_Value = 0
 Count = 0
 
-disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
-disp.Init()
+# disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
+# disp.Init()
     
 while READ_THREAD == False:
     try:
@@ -218,7 +221,7 @@ def Increment_Mode():
     #may need to add a sleep here so it doesn't register multiple presses
     #however I don't know if this will mess things up and cause a delay in serial readings
 DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] #moved this outside so it's not set every loop
-Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
+#Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
 PeakValues = [0,0,0,0,0,0]
 
 def Show_Peak():
@@ -228,17 +231,18 @@ def Show_Peak():
 while READ_THREAD == True:
     #might be a more efficient way to do this, so we're not copying the values every loop
     #maybe a list of names that points to the value or something? 
+    
     DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
     
-    for i in range(len(DisplayValue)):
-        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-            PeakValues[Count] = DisplayValue[Count]
+    # for i in range(len(DisplayValue)):
+    #     if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
+    #         PeakValues[Count] = DisplayValue[Count]
 
     writetext(DisplayText[Count],DisplayValue[Count])
 
     ModeButton.when_pressed = Increment_Mode
-    PeakButton.while_pressed = Show_Peak
+    # PeakButton.while_pressed = Show_Peak
 
-    writetext(DisplayText[Count],str(DisplayValue[Count]) + Units[Count]) # Not sure if adding the strings here will actually work, needs testing 
+    #writetext(DisplayText[Count],str(DisplayValue[Count]) + Units[Count]) # Not sure if adding the strings here will actually work, needs testing 
     #ideally long term i should rewrite this so that only the value updates. There's no need to redraw the title and units every loop
     time.sleep(0.02)

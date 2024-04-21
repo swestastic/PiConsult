@@ -39,9 +39,9 @@ Device_I2C = 0
 
 #Speedometer Calibration 
 Stock_Ratio = 4.083
-New_Ratio = 4.636 
+New_Ratio = 4.083
 Stock_Tire_Height = 24.9
-New_Tire_Height = 25.1 #
+New_Tire_Height = 25.1 
 Combined_Ratio = (New_Ratio/Stock_Ratio) * (New_Tire_Height/Stock_Tire_Height)
 
 Units_MPH = 1 #set to 0 for kph
