@@ -19,9 +19,10 @@ font1 = ImageFont.truetype('Font.ttc', 18)
 font2 = ImageFont.truetype('Font.ttc', 24)
 
 # Button configs
-ModeButton = Button(6) #switch modes using a button attached to GPIO Pin 2
-PeakButton = Button(16) #show peak values using a button attached to GPIO Pin 3
-
+ModeButton = Button() #switch modes (data stream, DTC, test, settings)
+DisplayButton = Button(6) #switch displayed values using a button attached to GPIO Pin 6
+PeakButton = Button(16) #show peak values using a button attached to GPIO Pin 16
+PowerButton = Button()
 
 
 def writetext(upper,lower):
@@ -185,11 +186,11 @@ while READ_THREAD == False:
         writetext('flushed input',None)
         time.sleep(0.5)
         
-        #PORT.write(b'\xFF\xFF\xEF') #had to add the b because i was getting a typeerror
-        PORT.write(bytes([0xFF,0xFF,0xEF]))
+        PORT.write(bytes([0xFF,0xFF,0xEF])) #initialization sequence
         print('write to port')
         writetext('writing data',None)
         time.sleep(0.5)
+
         #PORT.read(1)
         #Connected = PORT.read(1)
         Connected = PORT.read_all()
@@ -213,7 +214,7 @@ while READ_THREAD == False:
         print('value error')
 
 
-def Increment_Mode():
+def Increment_Display():
     global Count
     Count += 1
     if Count > 5:
@@ -228,20 +229,81 @@ def Show_Peak():
     global Count
     writetext(PeakValues[Count]) #Modify writetext to allow for writing to the upper right or something for peak value
 
+def SettingsMode():
+    writetext('Temp Units','') #second one should be the current units, referenced from config?
+    DisplayButton.when_pressed = None #This should be a function that shows the next setting
+    PeakButton.when_pressed - None #This should be a function that changes the value of the current setting
+
+
+def Increment_Mode():
+    global Mode
+    Mode += 1 
+    if Mode > 3:
+        Mode = 0
+    
+    #first we need to send a stop bit so the ECU stops sending data
+    PORT.write(bytes([0x30])
+               
+    #then we need to initialize whichever mode we're switching to
+    if Mode == 0: #data stream
+        writetext('data stream',None)
+        PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
+    if Mode == 1: #DTC
+        writeText('DTC',None)
+        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
+            if ModeButton.is_pressed:
+                Mode += 1
+        PORT.write(bytes([0xD1])) #Tell ECU to send DTCs
+    if Mode == 2: #test
+        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
+                if ModeButton.is_pressed:
+                    Mode += 1
+        #PORT.write(bytes([0xD2]))
+    if Mode == 3: #settings
+        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
+            if ModeButton.is_pressed:
+                Mode += 1
+        SettingsMode()
+        
+
+def StreamData():
+    global SPEED_Value, RPM_Value, TEMP_Value, BATT_Value, MAF_Value, AAC_Value
+    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
+    for i in range(len(DisplayValue)):
+        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
+            PeakValues[i] = DisplayValue[i]
+    writetext(DisplayText[Count],DisplayValue[Count])
+
+def Modes():
+    global Mode
+    if Mode == 0: #data steam
+        StreamData()
+    if Mode == 1: # dtc
+        pass
+    if Mode == 2: # test
+        pass
+    if Mode == 3: # settings
+        pass
+        
+def Shutdown():
+    os.system('sudo shutdown -h now')
+
 while READ_THREAD == True:
     #might be a more efficient way to do this, so we're not copying the values every loop
     #maybe a list of names that points to the value or something? 
     
     DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
     
-    # for i in range(len(DisplayValue)):
-    #     if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-    #         PeakValues[Count] = DisplayValue[Count]
+    for i in range(len(DisplayValue)):
+        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
+            PeakValues[i] = DisplayValue[i]
 
     writetext(DisplayText[Count],DisplayValue[Count])
 
+    DisplayButton.when_pressed = Increment_Display
+    PeakButton.while_pressed = Show_Peak
     ModeButton.when_pressed = Increment_Mode
-    # PeakButton.while_pressed = Show_Peak
+    PowerButton.when_pressed = Shutdown
 
     #writetext(DisplayText[Count],str(DisplayValue[Count]) + Units[Count]) # Not sure if adding the strings here will actually work, needs testing 
     #ideally long term i should rewrite this so that only the value updates. There's no need to redraw the title and units every loop
