@@ -1,14 +1,14 @@
 import sys
 import os
 import time
-import math
-import serial
+#import math
+import serial # type: ignore
 import threading
 import datetime
 import config
 import OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
-from gpiozero import Button
+from gpiozero import Button # type: ignore
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -242,27 +242,30 @@ def Increment_Mode():
         Mode = 0
     
     #first we need to send a stop bit so the ECU stops sending data
-    PORT.write(bytes([0x30])
+    PORT.write(bytes([0x30]))
                
     #then we need to initialize whichever mode we're switching to
     if Mode == 0: #data stream
         writetext('data stream',None)
         PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
     if Mode == 1: #DTC
-        writeText('DTC',None)
+        writetext('DTC',None)
         ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-            if ModeButton.is_pressed:
-                Mode += 1
+        if ModeButton.is_pressed:
+            Mode += 1
+
+        from dtc_dict import dtc_codes #Load in DTC data
         PORT.write(bytes([0xD1])) #Tell ECU to send DTCs
+        DTCs = PORT.read(2) #Read in DTCs
     if Mode == 2: #test
         ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-                if ModeButton.is_pressed:
-                    Mode += 1
+        if ModeButton.is_pressed:
+            Mode += 1
         #PORT.write(bytes([0xD2]))
     if Mode == 3: #settings
         ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-            if ModeButton.is_pressed:
-                Mode += 1
+        if ModeButton.is_pressed:
+            Mode += 1
         SettingsMode()
         
 
