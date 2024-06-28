@@ -25,7 +25,3 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ## Acknowledgements
 Thanks to [fridlington](https://github.com/fridlington) for the K11 consult program which a lot of this is based off of and [gregsqueeb](https://github.com/gregsqueeb) for inspiring me to take this project on after seeing his implementation of a consult dash. The smaller form factor and design were inspired by the [Yashio Factory OkaChan](https://yashiofactory.co.jp/en/product/okachan-water-temp-3/)
-
-## Contact
-- Your Name - [your-email@example.com](mailto:your-email@example.com)
-- Project Link: [https://github.com/your-username/your-repo](https://github.com/your-username/your-repo)
