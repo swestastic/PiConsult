@@ -4,4 +4,4 @@
 
 cd /
 cd home/kylec/consult_box
-sudo python3 dashboard.py
+sudo python3 main.py

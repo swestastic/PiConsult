@@ -22,8 +22,8 @@ import serial
 import threading
 import datetime
 
-import config
-import OLED_2in42
+import Resources.config as config
+import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 font1 = ImageFont.truetype('Font.ttc', 18)
 font2 = ImageFont.truetype('Font.ttc', 24)

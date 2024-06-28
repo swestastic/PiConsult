@@ -13,7 +13,7 @@ import logging
 import time
 import traceback
 # from waveshare_OLED import OLED_2in42
-import OLED_2in42
+import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 logging.basicConfig(level=logging.DEBUG)
 

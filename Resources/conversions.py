@@ -1,4 +1,4 @@
-import config
+import config as config
 
 if config.Units_Speed == 1:
         #Speed_Units = 'MPH'

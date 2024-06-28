@@ -1,16 +1,15 @@
 import sys
 import os
 import time
-#import math
 import serial # type: ignore
 import threading
 import datetime
-import config
-import OLED_2in42
+import Resources.config as config
+import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
-from conversions import convertToSpeed, convertToRev, convertToTemp, convertToBattery, convertToMAF, convertToAAC, convertToInjection, convertToTiming  
-from settings import *
+from Resources.conversions import convertToSpeed, convertToRev, convertToTemp, convertToBattery, convertToMAF, convertToAAC, convertToInjection, convertToTiming  
+from Resources.settings import *
 # from configupdater import ConfigUpdater
 
 # OLED screen info

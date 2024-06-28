@@ -28,7 +28,7 @@
 #
 
 #from . import config
-import config
+import config as config
 import time
 import numpy as np
 

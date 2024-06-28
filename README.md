@@ -15,18 +15,13 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 3. Set ConsultStart.sh to run at boot
 
 ## Usage
-1. Connect the SPI display to the Raspberry Pi.
-2. Run the Python script: `python main.py`
+1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
+2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal.
 3. The script will start recording data over serial and display it on the SPI display.
 
 ## Configuration
-- Modify the `config.py` file to specify the serial port and other settings.
-
-## Contributing
-Contributions are welcome! Please fork the repository and submit a pull request.
-
-## License
-This project is licensed under the [MIT License](LICENSE).
+- Modify `Resources/confs.ini` to specify the serial port and other settings. 
+- `Resources/config.py` is configuration settings for the OLED displayas provided by the manufacturer.
 
 ## Acknowledgements
 Thanks to [fridlington](https://github.com/fridlington) for the K11 consult program which a lot of this is based off of and [gregsqueeb](https://github.com/gregsqueeb) for inspiring me to take this project on after seeing his implementation of a consult dash. The smaller form factor and design were inspired by the [Yashio Factory OkaChan](https://yashiofactory.co.jp/en/product/okachan-water-temp-3/)

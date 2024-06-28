@@ -1,4 +1,4 @@
-from configupdater import ConfigUpdater
+# from configupdater import ConfigUpdater # This is the library that we use to read and write to the config file
 
 def Increment_Setting():
     global SettingsCount
@@ -35,7 +35,7 @@ def Change_Setting():
     global temp
     global SettingsCount
 
-    import config
+    import Resources.config as config
 
     updater =  ConfigUpdater()
     updater.read('confs.ini')
