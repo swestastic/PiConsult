@@ -1,0 +1,20 @@
+Hardware:
+-Order LCD screen and try that since OLED has been unreliable
+--This will require changes to SolidWorks design because it will be a 1.9" screen instead of 2.42"
+
+-ESP32, micropython? Or try to rewrite in C++ 
+
+-Wire in additional two buttons
+
+Software:
+-Faster boot times for RPi
+
+-Allow persistance / saving updated config files for settings like temperature and speed units
+
+-Choose GPIO pins for 2 additional buttons
+
+-Test DTC and make sure it communicates with ECU correctly
+
+-Keep developing settings mode and think about if there are any other settings that could be good to toggle
+
+- May need to run pip install configupdater on the pi

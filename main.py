@@ -9,6 +9,9 @@ import config
 import OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
+from conversions import convertToSpeed, convertToRev, convertToTemp, convertToBattery, convertToMAF, convertToAAC, convertToInjection, convertToTiming  
+from settings import *
+# from configupdater import ConfigUpdater
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -20,12 +23,12 @@ font2 = ImageFont.truetype('Font.ttc', 24)
 
 # Button configs
 ModeButton = Button() #switch modes (data stream, DTC, test, settings)
-DisplayButton = Button(6) #switch displayed values using a button attached to GPIO Pin 6
+DisplayButton = Button(6) #switch displayed values (i.e. speed, rpm, etc. Or in settings mode switch which setting is shown)
 PeakButton = Button(16) #show peak values using a button attached to GPIO Pin 16
 PowerButton = Button()
 
 
-def writetext(upper,lower):
+def writetext(upper,lower): #Writes text to the display
     image = Image.new('1', (128, 64), 255)
     draw = ImageDraw.Draw(image)
     draw.text((20,0),str(upper), font = font1, fill = 0)
@@ -50,8 +53,10 @@ def portconnect():
                 PORT.open()  # port is not none but is closed
             else:
                 print('Failed to initialize PORT')  # Handle the case where PORT is still None
+
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
+
 while PORT is None:
     portconnect()
     time.sleep(1)
@@ -123,43 +128,43 @@ class ReadStream(threading.Thread):
         #? Speed ? CAS/RPM ? CoolantTemp ? BatteryVoltage ? ThrottlePosition ? CAS/RPM ? MAF ? LH02 ? DigitalBit ? IgnitionTiming ? AAC ? AFAlphaL ? AFAlphaLSelfLear ? M/R F/C Mnt ?
         #cant think of  a reason for declerations and initialisations to be seperate
         self.consume_data() 
-    
-    if config.Units_MPH == 1:
-        #Speed_Units = 'MPH'
-        def convertToSpeed(self,inputData):
-            return int(round((inputData * 2.11) * 0.621371192237334 * config.Combined_Ratio))
-    else:
-        #Speed_Units = 'KPH'
-        def convertToSpeed(self,inputData):
-            return int(round((inputData * 2.11)*config.Combined_Ratio))
+####### moved to conversions.py ###############################################################################    
+    # if config.Units_Speed == 1:
+    #     #Speed_Units = 'MPH'
+    #     def convertToSpeed(self,inputData):
+    #         return int(round((inputData * 2.11) * 0.621371192237334 * config.Combined_Ratio))
+    # else:
+    #     #Speed_Units = 'KPH'
+    #     def convertToSpeed(self,inputData):
+    #         return int(round((inputData * 2.11)*config.Combined_Ratio))
         
-    if config.Units_Farenheight == 1:
-        #Temp_Units = 'F'
-        def convertToTemp(self,inputData):
-            return (inputData - 50) * 9/5 + 32
-    else:
-        #Temp_Units = 'C'
-        def convertToTemp(self,inputData):
-            return inputData - 50
+    # if config.Units_Temp == 1:
+    #     #Temp_Units = 'F'
+    #     def convertToTemp(self,inputData):
+    #         return (inputData - 50) * 9/5 + 32
+    # else:
+    #     #Temp_Units = 'C'
+    #     def convertToTemp(self,inputData):
+    #         return inputData - 50
 
-    def convertToRev(self,inputData):
-        return int(round((inputData * 12.5),2))
+    # def convertToRev(self,inputData):
+    #     return int(round((inputData * 12.5),2))
 
-    def convertToBattery(self,inputData):
-        return round(((inputData * 80) / 1000),1)
+    # def convertToBattery(self,inputData):
+    #     return round(((inputData * 80) / 1000),1)
 
-    def convertToMAF(self,inputData):
-        return inputData * 5
+    # def convertToMAF(self,inputData):
+    #     return inputData * 5
 
-    def convertToAAC(self,inputData): 
-        return inputData / 2
+    # def convertToAAC(self,inputData): 
+    #     return inputData / 2
 
-    def convertToInjection(self,inputData):
-        return inputData / 100
+    # def convertToInjection(self,inputData):
+    #     return inputData / 100
 
-    def convertToTiming(self,inputData):
-        return 110 - inputData
-
+    # def convertToTiming(self,inputData):
+    #     return 110 - inputData
+######################################################################################
     def logToFile(self,data,fileName):
         with open(fileName + '.hex', 'a+') as logFile:
             logFile.write(data)
@@ -173,8 +178,6 @@ AAC_Value = 0
 MAF_Value = 0
 Count = 0
 
-# disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
-# disp.Init()
     
 while READ_THREAD == False:
     try:
@@ -191,8 +194,6 @@ while READ_THREAD == False:
         writetext('writing data',None)
         time.sleep(0.5)
 
-        #PORT.read(1)
-        #Connected = PORT.read(1)
         Connected = PORT.read_all()
         print('connected',Connected)
         if Connected == b'\x00\x00\x10':
@@ -213,15 +214,14 @@ while READ_THREAD == False:
         # PORT.open()
         print('value error')
 
-
 def Increment_Display():
     global Count
     Count += 1
     if Count > 5:
         Count = 0
     #may need to add a sleep here so it doesn't register multiple presses
-    #however I don't know if this will mess things up and cause a delay in serial readings
-DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] #moved this outside so it's not set every loop
+    #however I don't know if this will mess things up and cause a delay in serial readings, i think it shouldn't because it's a idfferent thread
+DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
 #Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
 PeakValues = [0,0,0,0,0,0]
 
@@ -229,11 +229,41 @@ def Show_Peak():
     global Count
     writetext(PeakValues[Count]) #Modify writetext to allow for writing to the upper right or something for peak value
 
-def SettingsMode():
-    writetext('Temp Units','') #second one should be the current units, referenced from config?
-    DisplayButton.when_pressed = None #This should be a function that shows the next setting
-    PeakButton.when_pressed - None #This should be a function that changes the value of the current setting
+################ moved to settings.py #############################################################################################
+# def Change_Setting():
+#     global SettingsCount
+#     #take the value of the current setting we're on and update it using setting = (setting+1)%2 so we cycle between 0 and 1
+#     if SettingsCount == 0:
+#         config.Units_Speed = (config.Units_Speed + 1) % 2 #update the value locally, but really this should be written to the config file
 
+#     if SettingsCount == 1:
+#         config.Units_Temp = (config.Units_Temp + 1) % 2
+
+
+# def Increment_Setting():
+#     global SettingsCount
+#     SettingsCount += 1
+#     if SettingsCount > 1:
+#         SettingsCount = 0
+
+# def SettingsMode():
+#     SettingsNames = ['Speed Units','Temp Units']
+    
+#     if config.Units_Speed == 1:
+#         SU = 'MPH' # Speed Units
+#     else:
+#         SU = 'KPH'
+#     if config.Units_Temp == 1:
+#         TU = 'F' # Temp Units
+#     else:
+#         TU = 'C'
+#     SettingsValues = [SU,TU]
+
+#     writetext(SettingsNames[SettingsCount],SettingsValues[SettingsCount]) #second one should be the current units, referenced from config?
+    
+#     DisplayButton.when_pressed = Increment_Setting #This should be a function that shows the next setting
+#     PeakButton.when_pressed = Change_Setting #This should be a function that changes the value of the current setting
+#############################################################################################################
 
 def Increment_Mode():
     global Mode
@@ -286,22 +316,24 @@ def Modes():
     if Mode == 2: # test
         pass
     if Mode == 3: # settings
-        pass
+        SettingsMode()
         
 def Shutdown():
+    writetext('shutting down',None)
     os.system('sudo shutdown -h now')
 
 while READ_THREAD == True:
-    #might be a more efficient way to do this, so we're not copying the values every loop
-    #maybe a list of names that points to the value or something? 
-    
-    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
-    
-    for i in range(len(DisplayValue)):
-        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-            PeakValues[i] = DisplayValue[i]
 
-    writetext(DisplayText[Count],DisplayValue[Count])
+    Modes()
+#     ####### This will be replaced by StreamData() ########################################################
+#     DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
+    
+#     for i in range(len(DisplayValue)):
+#         if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
+#             PeakValues[i] = DisplayValue[i]
+
+#     writetext(DisplayText[Count],DisplayValue[Count])
+# ############################################################################################################
 
     DisplayButton.when_pressed = Increment_Display
     PeakButton.while_pressed = Show_Peak
