@@ -9,8 +9,8 @@ import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
 from Resources.conversions import convertToSpeed, convertToRev, convertToTemp, convertToBattery, convertToMAF, convertToAAC, convertToInjection, convertToTiming  
-from Resources.settings import *
-# from configupdater import ConfigUpdater
+from Resources.Modes.Settings.settings import *
+# from Resources.ConfigUpdater import ConfigUpdater
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -106,7 +106,7 @@ class ReadStream(threading.Thread):
             if incomingData:
                 dataList = list(incomingData)
 
-            # if not self.check_data_size(dataList): ##BROKEN!!! FIX ME
+            # if not self.check_data_size(dataList): ## NOTE BROKEN!! FIX ME!!!
             #     continue
                 
             try:
@@ -124,9 +124,9 @@ class ReadStream(threading.Thread):
     def run(self):
         #PORT.write('\x5A\x0B\x5A\x01\x5A\x08\x5A\x0C\x5A\x0D\x5A\x03\x5A\x05\x5A\x09\x5A\x13\x5A\x16\x5A\x17\x5A\x1A\x5A\x1C\x5A\x21\xF0')
         PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
-        #? Speed ? CAS/RPM ? CoolantTemp ? BatteryVoltage ? ThrottlePosition ? CAS/RPM ? MAF ? LH02 ? DigitalBit ? IgnitionTiming ? AAC ? AFAlphaL ? AFAlphaLSelfLear ? M/R F/C Mnt ?
-        #cant think of  a reason for declerations and initialisations to be seperate
+        #/ Speed / CAS/RPM / CoolantTemp / BatteryVoltage / ThrottlePosition / CAS/RPM / MAF / LH02 / DigitalBit / IgnitionTiming / AAC / AFAlphaL / AFAlphaLSelfLear / M/R F/C Mnt /
         self.consume_data() 
+
 ####### moved to conversions.py ###############################################################################    
     # if config.Units_Speed == 1:
     #     #Speed_Units = 'MPH'
@@ -200,7 +200,7 @@ while READ_THREAD == False:
             ReadStream(True)
             writetext('connected',None)
 
-    # except OSError:
+    # except OSError: # NOTE run some tests and see where we enounter this error
     #     if PORT.is_open:
     #         writetext('port open')
     #         pass
@@ -214,19 +214,20 @@ while READ_THREAD == False:
         print('value error')
 
 def Increment_Display():
-    global Count
-    Count += 1
-    if Count > 5:
-        Count = 0
+    global DisplayIndex
+    DisplayIndex += 1
+    if DisplayIndex > 5:
+        DisplayIndex = 0
     #may need to add a sleep here so it doesn't register multiple presses
     #however I don't know if this will mess things up and cause a delay in serial readings, i think it shouldn't because it's a idfferent thread
+
 DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
 #Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
 PeakValues = [0,0,0,0,0,0]
 
 def Show_Peak():
-    global Count
-    writetext(PeakValues[Count]) #Modify writetext to allow for writing to the upper right or something for peak value
+    global DisplayIndex
+    writetext(PeakValues[DisplayIndex]) #Modify writetext to allow for writing to the upper right or something for peak value
 
 ################ moved to settings.py #############################################################################################
 # def Change_Setting():
@@ -276,6 +277,7 @@ def Increment_Mode():
     #then we need to initialize whichever mode we're switching to
     if Mode == 0: #data stream
         writetext('data stream',None)
+        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
         PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
     if Mode == 1: #DTC
         writetext('DTC',None)
@@ -283,14 +285,17 @@ def Increment_Mode():
         if ModeButton.is_pressed:
             Mode += 1
 
-        from dtc_dict import dtc_codes #Load in DTC data
+        from Resources.dtc_dict import dtc_codes #Load in DTC data
         PORT.write(bytes([0xD1])) #Tell ECU to send DTCs
         DTCs = PORT.read(2) #Read in DTCs
+
     if Mode == 2: #test
+        writetext('test',None)
         ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
         if ModeButton.is_pressed:
             Mode += 1
         #PORT.write(bytes([0xD2]))
+
     if Mode == 3: #settings
         ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
         if ModeButton.is_pressed:
@@ -304,22 +309,33 @@ def StreamData():
     for i in range(len(DisplayValue)):
         if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
             PeakValues[i] = DisplayValue[i]
-    writetext(DisplayText[Count],DisplayValue[Count])
+    writetext(DisplayText[DisplayIndex],DisplayValue[DisplayIndex])
 
 def Modes():
     global Mode
     if Mode == 0: #data steam
         StreamData()
+
     if Mode == 1: # dtc
         pass
+
     if Mode == 2: # test
         pass
+
     if Mode == 3: # settings
         SettingsMode()
         
-def Shutdown():
-    writetext('shutting down',None)
-    os.system('sudo shutdown -h now')
+def Shutdown(): # NOTE check that this actually works
+    writetext('Shutting down in 5s','Press any button to cancel')
+    t_start = time.time()
+    while time.time() - t_start < 5:
+        writetext('shutting down in'+str(5 - int(time.time() - t_start))+'s','Press any button to cancel')
+        if PowerButton.is_pressed or DisplayButton.is_pressed or PeakButton.is_pressed or ModeButton.is_pressed:
+            writetext('shutdown cancelled',None)
+            return 
+    else:
+        writetext('shutting down',None)
+        os.system('sudo shutdown -h now')
 
 while READ_THREAD == True:
 

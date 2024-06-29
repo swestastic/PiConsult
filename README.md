@@ -4,13 +4,13 @@
 This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display.
 
 ## Prerequisites
-- Raspberry Pi with Raspbian OS
+- Raspberry Pi with Raspbian OS or similar
 - Python 3.x
 - SPI display module
 - Nissan Consult Cable
 
 ## Installation
-1. Clone the repository: `git clone https://github.com/your-username/your-repo.git`
+1. Clone the repository: `git clone https://github.com/swestastic/PiConsult.git`
 2. Install the required Python packages: `pip install -r requirements.txt`
 3. Set ConsultStart.sh to run at boot
 
