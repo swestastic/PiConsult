@@ -25,7 +25,8 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 - Builtin settings mode with adjustments for the following
   - Gear ratio (factory and adjusted)
   - Tire size (factory and adjusted)
-  - Injector size (factory and adjusted) <!--Idk how this behaves with a chipped ECU, which you would need if you're running different injector sizes--!>
+  - Injector size (factory and adjusted) 
+  <!-- Idk how injector duty cycle behaves with a chipped ECU, which you would need if you're running different injector sizes --!>
   - Speed units: MPH or KPH
   - Temperature units: Farenheight or Celsius
 - Data logging to SD card
