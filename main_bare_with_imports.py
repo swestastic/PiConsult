@@ -92,7 +92,7 @@ BATT_Value = 0
 AAC_Value = 0
 MAF_Value = 0
 
-def Enable_READ_THREAD(PORT,READ_THREAD): # NOTE Not sure if this will work 
+def Enable_READ_THREAD(PORT,READ_THREAD): # NOTE Not sure if this will work, may need to pull loop out of function
     while READ_THREAD == False:
         try:
             print('Attempting to connect to serial port')
