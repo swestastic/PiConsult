@@ -70,13 +70,16 @@ if config.Units_Temp == 1:
 else:
     Temp_Units = 'C'
 
-PORT = None  # Initialize PORT to None
+DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
+Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
 
+PORT = None
+
 while PORT is None:
-    PORT = PortConnect()
+    PORT = PortConnect(PORT)
     time.sleep(0.1)
     print('PORT = None')
     WriteText('Connecting...','Please wait')
@@ -88,46 +91,47 @@ TEMP_Value = 0
 BATT_Value = 0
 AAC_Value = 0
 MAF_Value = 0
-    
-while READ_THREAD == False:
-    try:
-        print('Attempting to connect to serial port')
-        WriteText('attempting to connect to serial port',None)
-        
-        PORT.flushInput()
-        print('Input flushed')
-        WriteText('Input flushed',None)
-        time.sleep(0.2)
-        
-        PORT.write(bytes([0xFF,0xFF,0xEF])) #initialization sequence
-        print('Writing initialization')
-        WriteText('Writing initialization...','Please wait')
-        time.sleep(0.2)
 
-        Connected = PORT.read_all()
-        print('Connected',Connected)
-        time.sleep(0.2)
+def Enable_READ_THREAD(PORT,READ_THREAD): # NOTE Not sure if this will work 
+    while READ_THREAD == False:
+        try:
+            print('Attempting to connect to serial port')
+            WriteText('attempting to connect to serial port',None)
+            
+            PORT.flushInput()
+            print('Input flushed')
+            WriteText('Input flushed',None)
+            time.sleep(0.2)
+            
+            PORT.write(bytes([0xFF,0xFF,0xEF])) #initialization sequence
+            print('Writing initialization')
+            WriteText('Writing initialization...','Please wait')
+            time.sleep(0.2)
 
-        if Connected == b'\x00\x00\x10':
-            READ_THREAD = True
-            ReadStream(True)
-            WriteText('Connected',None)
+            Connected = PORT.read_all()
+            print('Connected',Connected)
+            time.sleep(0.2)
 
-    # except OSError: # NOTE run some tests and see where we enounter this error
-    #     if PORT.is_open:
-    #         WriteText('port open')
-    #         pass
-    #     else:
-    #         PORT.open()
-    #     WriteText('OSError')
-    #     continue
+            if Connected == b'\x00\x00\x10':
+                READ_THREAD = True
+                ReadStream(True)
+                WriteText('Connected',None)
 
-    except ValueError:
-        # PORT.open()
-        print('value error')
+        # except OSError: # NOTE run some tests and see where we enounter this error
+        #     if PORT.is_open:
+        #         WriteText('port open')
+        #         pass
+        #     else:
+        #         PORT.open()
+        #     WriteText('OSError')
+        #     continue
 
-DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
-Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
+        except ValueError:
+            # PORT.open()
+            print('value error')
+    return READ_THREAD
+
+READ_THREAD = Enable_READ_THREAD(PORT,READ_THREAD)
 
 while READ_THREAD == True:
     # NOTE Ideally creating a new list every loop is not ideal, but it's a quick fix for now
