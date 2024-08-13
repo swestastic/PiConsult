@@ -23,10 +23,14 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - TPS open/closed
   - Clutch switch on/off
   - Starter signal on/off
-
 - Peak values saved and viewable with button press
 - Data Trouble Codes (DTC) reading and resetting
-- Test mode (manually trigger valves, injectors, coil packs, etc)
+- Test mode
+  - Power Balance
+  - EGR on/off
+  - Fuel pump on/off
+  - Clear fuel self learn
+  - Probably others
 - Blinking light or screen flash for RPM shift light or overheating
 - Builtin settings mode with adjustments for the following
   - Gear ratio (factory and adjusted)
