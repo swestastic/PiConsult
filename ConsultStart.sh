@@ -4,4 +4,4 @@
 
 cd /
 cd home/kylec/consult_box
-sudo python3 main.py
+sudo python3 main_bare_with_imports.py
