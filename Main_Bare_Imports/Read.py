@@ -1,3 +1,4 @@
+# PORT is not defined in this file, might cause issues?
 import threading
 import datetime
 import time
@@ -19,7 +20,7 @@ class ReadStream(threading.Thread):
         read_Thread = True; # NOTE I think this is unused? Becuase it's a different case
         self.Header = 255
         self.returnBytes = 14
-        fileName = datetime.datetime.now().strftime("%d-%m-%y-%H-%M")
+        fileName = datetime.datetime.now().strftime("%d-%m-%y-%H-%M") # NOTE This is unused
         
         self.start()
         
@@ -53,6 +54,8 @@ class ReadStream(threading.Thread):
                 BATT_Value = self.convertToBattery(float(dataList[1]))
                 MAF_Value = self.convertToMAF(int(dataList[5]))
                 AAC_Value = self.convertToAAC(int(dataList[8]))
+                INJ_Value = self.convertToInjection(int(dataList[6])) # Not sure if this is the correct value in dataList
+                TIM_Value = self.convertToTiming(int(dataList[9])) # Not sure if this is the correct value in dataList
                   
             except (ValueError, IndexError):
                    pass         

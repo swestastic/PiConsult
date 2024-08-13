@@ -58,7 +58,7 @@ def Increment_Display():
     # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
 
     global DisplayIndex
-    DisplayIndex = (DisplayIndex + 1) % 6
+    DisplayIndex = (DisplayIndex + 1) % 8
 
 if config.Units_Speed == 1:
     Speed_Units = 'MPH'
@@ -70,8 +70,8 @@ if config.Units_Temp == 1:
 else:
     Temp_Units = 'C'
 
-DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
-Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
+DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT','INJ','TIM'] 
+Units = [Speed_Units,'RPM','V','%',Temp_Units,'V','%,','deg']
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
@@ -85,12 +85,7 @@ while PORT is None:
     WriteText('Connecting...','Please wait')
 
 READ_THREAD = False
-SPEED_Value = 0
-RPM_Value = 0
-TEMP_Value = 0
-BATT_Value = 0
-AAC_Value = 0
-MAF_Value = 0
+SPEED_Value,RPM_Value,TEMP_Value,BATT_Value,AAC_Value,MAF_Value,INJ_Value,TIM_Value = 0,0,0,0,0,0,0,0
 
 def Enable_READ_THREAD(PORT,READ_THREAD): # NOTE Not sure if this will work, may need to pull loop out of function
     while READ_THREAD == False:
@@ -138,7 +133,7 @@ while READ_THREAD == True:
     # Long term I should create DisplayValue as a numpy array and update the values in place
     # Just need to figure out how to do that easily since there's different threads
 
-    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
+    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value,INJ_Value,TIM_Value] #this should update continuously
     WriteText(DisplayText[DisplayIndex],DisplayValue[DisplayIndex])
 
     DisplayButton.when_pressed = Increment_Display
