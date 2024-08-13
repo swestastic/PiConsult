@@ -69,7 +69,7 @@ if config.Units_Temp == 1:
     Temp_Units = 'F'
 else:
     Temp_Units = 'C'
-
+DisplayValue = np.zeros(8)
 DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT','INJ','TIM'] 
 Units = [Speed_Units,'RPM','V','%',Temp_Units,'V','deg']
 
@@ -133,7 +133,8 @@ while READ_THREAD == True:
     # Long term I should create DisplayValue as a numpy array and update the values in place
     # Just need to figure out how to do that easily since there's different threads
 
-    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value,INJ_Value,TIM_Value] #this should update continuously
+    # DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value,INJ_Value,TIM_Value] #this should update continuously
+    DisplayValue[:] = SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value,INJ_Value,TIM_Value #this should update continuously
     WriteText(DisplayText[DisplayIndex],DisplayValue[DisplayIndex])
 
     DisplayButton.when_pressed = Increment_Display
