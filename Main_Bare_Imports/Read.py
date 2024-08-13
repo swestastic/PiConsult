@@ -103,6 +103,9 @@ class ReadStream(threading.Thread):
 
     def convertToTiming(self,inputData):
         return 110 - inputData
+    
+    def convertToTPS(self,inputData):
+        return inputData * 20 * 1000
 
     def logToFile(self,data,fileName):
         with open(fileName + '.hex', 'a+') as logFile:
