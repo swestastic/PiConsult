@@ -71,7 +71,7 @@ else:
     Temp_Units = 'C'
 
 DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT','INJ','TIM'] 
-Units = [Speed_Units,'RPM','V','%',Temp_Units,'V',V','deg']
+Units = [Speed_Units,'RPM','V','%',Temp_Units,'V','deg']
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
