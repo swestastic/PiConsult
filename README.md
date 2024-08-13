@@ -18,6 +18,12 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ## Future Functionality
 
+- More data able to be displayed
+  - TPS percentage
+  - TPS open/closed
+  - Clutch switch on/off
+  - Starter signal on/off
+
 - Peak values saved and viewable with button press
 - Data Trouble Codes (DTC) reading and resetting
 - Test mode (manually trigger valves, injectors, coil packs, etc)
