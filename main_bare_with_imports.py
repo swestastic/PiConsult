@@ -54,6 +54,22 @@ def PortConnect(PORT):
                 print('Failed to initialize PORT')  # Handle the case where PORT is still None
     return PORT
 
+def Increment_Display():
+    # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
+
+    global DisplayIndex
+    DisplayIndex = (DisplayIndex + 1) % 6
+
+if config.Units_Speed == 1:
+    Speed_Units = 'MPH'
+else:
+    Speed_Units = 'KPH'
+
+if config.Units_Temp == 1:
+    Temp_Units = 'F'
+else:
+    Temp_Units = 'C'
+
 PORT = None  # Initialize PORT to None
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
@@ -72,17 +88,6 @@ TEMP_Value = 0
 BATT_Value = 0
 AAC_Value = 0
 MAF_Value = 0
-
-if config.Units_Speed == 1:
-    Speed_Units = 'MPH'
-else:
-    Speed_Units = 'KPH'
-
-if config.Units_Temp == 1:
-    Temp_Units = 'F'
-else:
-    Temp_Units = 'C'
-
     
 while READ_THREAD == False:
     try:
@@ -120,12 +125,6 @@ while READ_THREAD == False:
     except ValueError:
         # PORT.open()
         print('value error')
-
-def Increment_Display():
-    # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
-
-    global DisplayIndex
-    DisplayIndex = (DisplayIndex + 1) % 6
 
 DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
 Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
