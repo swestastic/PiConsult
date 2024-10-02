@@ -28,7 +28,7 @@
 #
 
 #from . import config
-import config as config
+from Resources import config
 import time
 import numpy as np
 
@@ -146,9 +146,9 @@ class OLED_2in42(config.RaspberryPi):
         self.ShowImage(_buffer) 
 
     def writetext(str):
-        image = Image.new('1', (disp.width, disp.height), 255)
-        draw = ImageDraw.Draw(image)
-        draw.text((20,0),str(text), font = font1, fill = 0)
-        #draw.text((20,24), str(i), font = font2, fill = 0)
+        image = Image.new('1', (disp.width, disp.height), 255) #type: ignore
+        draw = ImageDraw.Draw(image) #type: ignore
+        draw.text((20,0),str(text), font = font1, fill = 0) #type: ignore
+        #draw.text((20,24), str(i), font = font2, fill = 0) #type: ignore
         image2 = image2.rotate(180) 
-        disp.ShowImage(disp.getbuffer(image2))
+        disp.ShowImage(disp.getbuffer(image2)) #type: ignore

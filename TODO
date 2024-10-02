@@ -13,12 +13,18 @@
 
 - Faster boot times for RPi
 
-- Allow persistance / saving updated config files for settings like temperature and speed units
+- Implement code from SettingTest.py to have a functional settings mode
+
+  - Update definitions in Read.py to generate correct data after changing units without needing a reboot
+
+  - Update Read.py and main_bare_with_imports.py to refer to configJSON.json for values instead of config.py
 
 - Choose GPIO pins for 2 additional buttons
 
 - Test DTC and make sure it communicates with ECU correctly
 
-- Keep developing settings mode and think about if there are any other settings that could be good to toggle
+- Figure out calculations for fuel efficiency. MPG might be on the right track, need to swap Km/L to L/100Km
 
-- May need to run pip install configupdater on the pi
+- Figure out why data is being displayed as floats on oled
+
+- PWM output for rpm, eventually make configurable for what to output via the pwm pin

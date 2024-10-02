@@ -37,6 +37,17 @@ from gpiozero import *
 Device_SPI = 1
 Device_I2C = 0
 
+Units_Speed = 1
+Units_Temp = 1
+
+Injector_Size = 270
+
+Stock_Final = 4.083
+New_Final = 4.083
+Stock_Tire_Height = 24.9
+New_Tire_Height = 25.1 
+Combined_Ratio = (New_Final/Stock_Final) * (New_Tire_Height/Stock_Tire_Height)
+
 class RaspberryPi:
     def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=10000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
         self.INPUT = False

@@ -1,16 +1,16 @@
-import sys
-import os
-import time
-import serial # type: ignore
-import threading
-import datetime
-import Resources.config as config
+# This is intended to be a barebones version of the main.py file
+# Once features are implemented and tested, they will be added here
+# This serves as a backup and a way to keep core functionality
+
+import sys,os,time,serial,threading,datetime,json #type: ignore
+from Resources import config
+from Main_Bare_Imports.Settings import Load_Config, Save_Config
 import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
-from Resources.conversions import convertToSpeed, convertToRev, convertToTemp, convertToBattery, convertToMAF, convertToAAC, convertToInjection, convertToTiming  
-from Resources.Modes.Settings.settings import *
-# from Resources.ConfigUpdater import ConfigUpdater
+import numpy as np
+from Resources import dtc_dict as DTC_DICT
+from Main_Bare_Imports.Read import ReadStream
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -18,15 +18,35 @@ Device_I2C = config.Device_I2C
 OLED_WIDTH   = 128
 OLED_HEIGHT  = 64
 font1 = ImageFont.truetype('Font.ttc', 18)
-font2 = ImageFont.truetype('Font.ttc', 24)
+font2 = ImageFont.truetype('Font.ttc', 20)
 
 # Button configs
-ModeButton = Button() #switch modes (data stream, DTC, test, settings)
 DisplayButton = Button(6) #switch displayed values (i.e. speed, rpm, etc. Or in settings mode switch which setting is shown)
-PeakButton = Button(16) #show peak values using a button attached to GPIO Pin 16
-PowerButton = Button()
+PeakButton = Button(16) # Show peak value of current mode
+SettingButton = Button(26)
 
-def writetext(upper,lower): #Writes text to the display
+# ModeButton = Button() # Switch between modes
+# PowerButton = Button() # Power button to turn off the device
+# PowerButton.hold_time = 2 # Hold for 2 seconds to shut down
+
+# General Configs
+
+Settings = Load_Config()
+
+Units_Speed = Settings["Units_Speed"]
+Units_Temp = Settings["Units_Temp"]
+Stock_Tire_Height = Settings["Stock_Tire_Height"]
+Stock_Tire_AR = Settings["Stock_Tire_AR"]
+Stock_Tire_Diam = Settings["Stock_Tire_Diam"]
+New_Tire_Height = Settings["New_Tire_Height"]
+New_Tire_AR = Settings["New_Tire_AR"]
+New_Tire_Diam = Settings["New_Tire_Diam"]
+Default_Display = Settings["Default_Display"]
+Injector_Size = Settings["Injector_Size"]
+
+def WriteText(upper,lower): 
+    # Writes text to the display
+
     image = Image.new('1', (128, 64), 255)
     draw = ImageDraw.Draw(image)
     draw.text((20,0),str(upper), font = font1, fill = 0)
@@ -35,323 +55,196 @@ def writetext(upper,lower): #Writes text to the display
     image = image.rotate(180) 
     disp.ShowImage(disp.getbuffer(image))
 
-PORT = None  # Initialize PORT to None
+def PortConnect(PORT):
+    # Tries to connect to serial port
 
-def portconnect():
-    global PORT
     try:
         PORT = serial.Serial('/dev/ttyUSB0', 9600, timeout=None)
     except OSError:
         if PORT:
-            print('Port is not none')
             if PORT.is_open:  # Check if PORT is not None and is open
-                print('Port is open')
+                WriteText('Port is open',None)
         else:
             if PORT:
                 PORT.open()  # port is not none but is closed
             else:
-                print('Failed to initialize PORT')  # Handle the case where PORT is still None
+                WriteText('Init Fail',None)  # Handle the case where PORT is still None
+    return PORT
+
+def ECU_Connect(PORT,ECU_CONNECTED):
+    # Attempts to connect to the ECU using the initialization sequence.
+    # Then depending on which mode we want we can send the mode-specific
+    # initialization sequence
+    
+    while ECU_CONNECTED == False:
+        try:
+            WriteText('Connecting...','Please wait')
+            
+            PORT.flushInput()
+            WriteText('Input flushed','Please wait')
+            time.sleep(0.1)
+            
+            PORT.write(bytes([0xFF,0xFF,0xEF])) #initialization sequence
+            WriteText('Writing init...','Please wait')
+            time.sleep(0.1)
+
+            Connected = PORT.read_all()
+
+            if Connected == b'\x00\x00\x10':
+                WriteText('Connected',None)
+                ECU_CONNECTED = True
+
+            else: # NOTE might be able to remove this
+                PORT = PortConnect(PORT)
+
+        except ValueError:
+            # PORT.open()
+            print('Value error')
+    return ECU_CONNECTED
+
+def Increment_Display():
+    # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
+    global DisplayIndex
+    DisplayIndex = (DisplayIndex + 1) % 10
+
+def Increment_DTC():
+    global DTCIndex
+    DTCIndex = (DTCIndex + 1) % len(DTC_Codes)
+
+def Increment_Settings():
+    # Increments the settings index, which tells us what to show on the screen in SETTINGS_THREAD mode
+    global SettingIndex
+    SettingIndex = (SettingIndex + 1) % 6
+
+def Show_Peak():
+    global DisplayIndex
+    WriteText('Peak'+str(DisplayText[DisplayIndex]),str(PeakValues[DisplayIndex])+str(Units[DisplayIndex]))
+    time.sleep(1.5)
+
+def Shutdown():
+    global disp, READ_THREAD, DTC_THREAD
+    # Shuts down the device
+    WriteText('Shutting down',None) 
+    time.sleep(1)
+    disp.clear()
+    disp.module_exit()
+    READ_THREAD = False
+    DTC_THREAD = False
+    os.system('sudo shutdown now')
+
+if config.Units_Speed == 1:
+    Speed_Units = 'MPH'
+else:
+    Speed_Units = 'KPH'
+
+if config.Units_Temp == 1:
+    Temp_Units = 'F'
+else:
+    Temp_Units = 'C'
+
+SettingIndex = 0
+DisplayIndex = Default_Display
+
+DisplayValues = np.zeros(10)
+DisplayText = ['RPM','SPEED','MAF','AAC','TEMP','BATT','INJ','TIM','TPS','EFF'] 
+
+SettingText = ['Speed Units','Temp Units','Final Drive', 'Tire Size', 'Injector Size', 'Default Display']
+SettingValues = [Units_Speed,Units_Temp,config.Combined_Ratio,New_Tire_Height,config.Injector_Size,DisplayText[Default_Display]]
+
+PeakValues = np.zeros(10)
+Units = ['RPM',Speed_Units,'V','%',Temp_Units,'V','%','deg','%','EFF']
+DTC_Codes = []
+DTC_Counts = []
+DTCIndex = 0
 
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
 
-while PORT is None:
-    portconnect()
-    time.sleep(1)
-    print('PORT = None')
-    writetext('port','port')
-
-########################################################################
-class ReadStream(threading.Thread):
-
-    def __init__(self, daemon):
-        threading.Thread.__init__(self)
-        self.daemon = daemon
-        self.SPEED_Value = 0
-        self.RPM_Value = 0
-        self.TEMP_Value = 0
-        self.BATT_Value = 0
-        self.MAF_Value = 0
-        self.AAC_Value = 0
-        self.INJ_Value = 0
-        self.TIM_Value = 0
-        
-        read_Thread = True;
-        self.Header = 255
-        self.returnBytes = 14
-        fileName = datetime.datetime.now().strftime("%d-%m-%y-%H-%M")
-        
-        self.start()
-        
-        
-    def check_data_size(data_list):
-        Header = 255
-        returnBytes = 14
-        try:
-            if data_list[-4] != Header:
-                return False
-            if data_list[-3] != returnBytes:
-                return False   
-                    
-        except (ValueError, IndexError):
-            return False
-        return True
-                
-    def consume_data(self):
-        global SPEED_Value, RPM_Value, TEMP_Value, BATT_Value, MAF_Value, AAC_Value, INJ_Value, TIM_Value
-        read_thread = True
-        while read_thread:
-            incomingData = PORT.read(16)
-            if incomingData:
-                dataList = list(incomingData)
-
-            # if not self.check_data_size(dataList): ## NOTE BROKEN!! FIX ME!!!
-            #     continue
-                
-            try:
-                SPEED_Value = self.convertToSpeed(int(dataList[-2]))
-                RPM_Value = self.convertToRev(int(dataList[-1]))
-                TEMP_Value = self.convertToTemp(int(dataList[0]))
-                BATT_Value = self.convertToBattery(float(dataList[1]))
-                MAF_Value = self.convertToMAF(int(dataList[5]))
-                AAC_Value = self.convertToAAC(int(dataList[8]))
-                  
-            except (ValueError, IndexError):
-                   pass         
-            time.sleep(0.002)
-
-    def run(self):
-        #PORT.write('\x5A\x0B\x5A\x01\x5A\x08\x5A\x0C\x5A\x0D\x5A\x03\x5A\x05\x5A\x09\x5A\x13\x5A\x16\x5A\x17\x5A\x1A\x5A\x1C\x5A\x21\xF0')
-        PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
-        #/ Speed / CAS/RPM / CoolantTemp / BatteryVoltage / ThrottlePosition / CAS/RPM / MAF / LH02 / DigitalBit / IgnitionTiming / AAC / AFAlphaL / AFAlphaLSelfLear / M/R F/C Mnt /
-        self.consume_data() 
-
-    if config.Units_Speed == 1:
-        #Speed_Units = 'MPH'
-        def convertToSpeed(self,inputData):
-            return int(round((inputData * 2.11) * 0.621371192237334 * config.Combined_Ratio))
-    else:
-        #Speed_Units = 'KPH'
-        def convertToSpeed(self,inputData):
-            return int(round((inputData * 2.11)*config.Combined_Ratio))
-        
-    if config.Units_Temp == 1:
-        #Temp_Units = 'F'
-        def convertToTemp(self,inputData):
-            return (inputData - 50) * 9/5 + 32
-    else:
-        #Temp_Units = 'C'
-        def convertToTemp(self,inputData):
-            return inputData - 50
-
-    def convertToRev(self,inputData):
-        return int(round((inputData * 12.5),2))
-
-    def convertToBattery(self,inputData):
-        return round(((inputData * 80) / 1000),1)
-
-    def convertToMAF(self,inputData):
-        return inputData * 5
-
-    def convertToAAC(self,inputData): 
-        return inputData / 2
-
-    def convertToInjection(self,inputData):
-        return inputData / 100
-
-    def convertToTiming(self,inputData):
-        return 110 - inputData
-
-    def logToFile(self,data,fileName):
-        with open(fileName + '.hex', 'a+') as logFile:
-            logFile.write(data)
-
 READ_THREAD = False
-SPEED_Value = 0
-RPM_Value = 0
-TEMP_Value = 0
-BATT_Value = 0
-AAC_Value = 0
-MAF_Value = 0
-Count = 0
+DTC_THREAD = False
+SETTINGS_THREAD = False
+TESTS_THREAD = False
 
+PORT = None
+ECU_CONNECTED = False
+
+while PORT is None:
+    PORT = PortConnect(PORT)
+    # time.sleep(0.1)
+    WriteText('Connecting...','Please wait')
+
+####################################### Main loop #######################################
+
+ECU_CONNECTED = ECU_Connect(PORT,ECU_CONNECTED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
+
+if ECU_CONNECTED == True:
+    # if Mode == 0: # NOTE Placeholder for when we set up the modes
+    READ_THREAD = True
+    R = ReadStream(port=PORT, daemon=True)
+    time.sleep(0.1)
     
-while READ_THREAD == False:
-    try:
-        print('attempting to connect to serial port')
-        writetext('attempting to connect to serial port',None)
-        
-        PORT.flushInput()
-        print('flushed input')
-        writetext('flushed input',None)
-        time.sleep(0.5)
-        
-        PORT.write(bytes([0xFF,0xFF,0xEF])) #initialization sequence
-        print('write to port')
-        writetext('writing data',None)
-        time.sleep(0.5)
-
-        Connected = PORT.read_all()
-        print('connected',Connected)
-        if Connected == b'\x00\x00\x10':
-            READ_THREAD = True
-            ReadStream(True)
-            writetext('connected',None)
-
-    # except OSError: # NOTE run some tests and see where we enounter this error
-    #     if PORT.is_open:
-    #         writetext('port open')
-    #         pass
-    #     else:
-    #         PORT.open()
-    #     writetext('OSError')
-    #     continue
-
-    except ValueError:
-        # PORT.open()
-        print('value error')
-
-def Increment_Display():
-    global DisplayIndex
-    DisplayIndex = (DisplayIndex + 1) % 6
-    #may need to add a sleep here so it doesn't register multiple presses
-    #however I don't know if this will mess things up and cause a delay in serial readings, i think it shouldn't because it's a idfferent thread
-
-DisplayText = ['SPEED','RPM','MAF','AAC','TEMP','BATT'] 
-#Units = [Speed_Units,'RPM','V','%',Temp_Units,'V']
-PeakValues = [0,0,0,0,0,0]
-
-def Show_Peak():
-    global DisplayIndex
-    writetext(PeakValues[DisplayIndex]) #Modify writetext to allow for writing to the upper right or something for peak value
-
-def Change_Setting():
-    global SettingsCount
-    #take the value of the current setting we're on and update it using setting = (setting+1)%2 so we cycle between 0 and 1
-    if SettingsCount == 0:
-        config.Units_Speed = (config.Units_Speed + 1) % 2 #update the value locally, but really this should be written to the config file
-
-    if SettingsCount == 1:
-        config.Units_Temp = (config.Units_Temp + 1) % 2
-
-
-def Increment_Setting():
-    global SettingsCount
-    SettingsCount += 1
-    if SettingsCount > 1:
-        SettingsCount = 0
-
-def SettingsMode():
-    SettingsNames = ['Speed Units','Temp Units']
-    
-    if config.Units_Speed == 1:
-        SU = 'MPH' # Speed Units
-    else:
-        SU = 'KPH'
-    if config.Units_Temp == 1:
-        TU = 'F' # Temp Units
-    else:
-        TU = 'C'
-    SettingsValues = [SU,TU]
-
-    writetext(SettingsNames[SettingsCount],SettingsValues[SettingsCount]) #second one should be the current units, referenced from config?
-    
-    DisplayButton.when_pressed = Increment_Setting #This should be a function that shows the next setting
-    PeakButton.when_pressed = Change_Setting #This should be a function that changes the value of the current setting
-
-def Increment_Mode():
-    # Handles the changing between modes (data stream, DTC, test, settings), and the initialization of each mode
-    # First the mode counter is incremented,
-    # Then the stop bit is sent to the ECU so it stops what it is currently doing
-    # Then it will initialize the next mode with a 3 second window to keep selecting modes
-    
-    global Mode
-    Mode += 1 
-    if Mode > 3:
-        Mode = 0
-    
-    #first we need to send a stop bit so the ECU stops sending data
-    PORT.write(bytes([0x30]))
-               
-    #then we need to initialize whichever mode we're switching to
-    if Mode == 0: #data stream
-        writetext('data stream',None)
-        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-        PORT.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x21,0xF0]))
-    if Mode == 1: #DTC
-        writetext('DTC',None)
-        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-        if ModeButton.is_pressed:
-            Mode += 1
-
-        from Resources.dtc_dict import dtc_codes #Load in DTC data
-        PORT.write(bytes([0xD1])) #Tell ECU to send DTCs
-        DTCs = PORT.read(2) #Read in DTCs
-
-    if Mode == 2: #test
-        writetext('test',None)
-        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-        if ModeButton.is_pressed:
-            Mode += 1
-        #PORT.write(bytes([0xD2]))
-
-    if Mode == 3: #settings
-        ModeButton.wait_for_press(timeout=3.0) #allow for a 3 second window to keep selecting modes 
-        if ModeButton.is_pressed:
-            Mode += 1
-        SettingsMode()
-        
-
-def StreamData():
-    global SPEED_Value, RPM_Value, TEMP_Value, BATT_Value, MAF_Value, AAC_Value
-    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
-    for i in range(len(DisplayValue)):
-        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-            PeakValues[i] = DisplayValue[i]
-    writetext(DisplayText[DisplayIndex],DisplayValue[DisplayIndex])
-
-def Modes():
-    global Mode
-    if Mode == 0: #data steam
-        StreamData()
-
-    if Mode == 1: # dtc
-        pass
-
-    if Mode == 2: # test
-        pass
-
-    if Mode == 3: # settings
-        SettingsMode()
-        
-def Shutdown(): # NOTE check that this actually works
-    writetext('Shutting down in 5s','Press any button to cancel')
-    t_start = time.time()
-    while time.time() - t_start < 5:
-        writetext('shutting down in'+str(5 - int(time.time() - t_start))+'s','Press any button to cancel')
-        if PowerButton.is_pressed or DisplayButton.is_pressed or PeakButton.is_pressed or ModeButton.is_pressed:
-            writetext('shutdown cancelled',None)
-            return 
-    else:
-        writetext('shutting down',None)
-        os.system('sudo shutdown -h now')
-
 while READ_THREAD == True:
-    DisplayValue = [SPEED_Value,RPM_Value,MAF_Value,AAC_Value,TEMP_Value,BATT_Value] #this should update continuously
-    
-    for i in range(len(DisplayValue)):
-        if PeakValues[i] < DisplayValue[i]: #update the peak value if the current value is higher
-            PeakValues[i] = DisplayValue[i]
-
-    writetext(DisplayText[Count],DisplayValue[Count])
+    DisplayValues[:] = int(R.RPM_Value),int(R.SPEED_Value),R.MAF_Value,R.AAC_Value,int(R.TEMP_Value),R.BATT_Value,R.INJ_Value,int(R.TIM_Value),R.TPS_Value,R.FUEL_Value
+    WriteText(DisplayText[DisplayIndex],str(DisplayValues[DisplayIndex])+str(Units[DisplayIndex]))
+    for i in range(len(DisplayValues)):
+        if DisplayValues[i] > PeakValues[i]:
+            PeakValues[i] = DisplayValues[i]
 
     DisplayButton.when_pressed = Increment_Display
-    PeakButton.while_pressed = Show_Peak
-    ModeButton.when_pressed = Increment_Mode
-    PowerButton.when_pressed = Shutdown
+    if PeakButton.is_pressed:
+        Show_Peak()
 
-    writetext(DisplayText[Count],str(DisplayValue[Count]))
+    # PowerButton.when_held = Shutdown
 
-    # writetext(DisplayText[Count],str(DisplayValue[Count]) + Units[Count]) # Not sure if adding the strings here will actually work, needs testing 
-    #ideally long term i should rewrite this so that only the value updates. There's no need to redraw the title and units every loop
     time.sleep(0.02)
+
+while DTC_THREAD == True:
+    WriteText('Code: '+str(DTC_Codes[DTCIndex])+str(' Count:')+str(DTC_Counts[DTCIndex]),str(DTC_DICT[DTC_Codes[DTCIndex]]))
+    DisplayButton.when_pressed = Increment_DTC
+
+while SETTINGS_THREAD == True:
+    WriteText(SettingText[SettingIndex],SettingValues[SettingIndex]) # We probably only need to run this one instead of updating it every time the loop cycles
+
+    DisplayButton.when_pressed = Increment_Settings
+    
+    if SettingButton.is_pressed:
+        if SettingIndex == 0:
+            if Units_Speed == 'MPH':
+                Units_Speed = 'KPH'
+                SettingValues[SettingIndex] = Units_Speed
+                Settings["Units_Speed"] = Units_Speed
+                Save_Config(Settings)
+
+            elif Units_Speed == 'KPH':
+                Units_Speed = 'MPH'
+                SettingValues[SettingIndex] = Units_Speed
+                Settings["Units_Speed"] = Units_Speed
+                Save_Config(Settings)
+
+        if SettingIndex == 1:
+            if Units_Temp == 'F':
+                Units_Temp = 'C'
+                SettingValues[SettingIndex] = Units_Temp
+                Settings["Units_Temp"] = Units_Temp
+                Save_Config(Settings)
+
+            elif Units_Temp == 'C':
+                Units_Temp = 'F'
+                SettingValues[SettingIndex] = Units_Temp
+                Settings["Units_Temp"] = Units_Temp
+                Save_Config(Settings)
+
+        if SettingIndex == 2:
+            pass
+
+        if SettingIndex == 3:
+            pass
+
+        if SettingIndex == 4:
+            pass
+
+        if SettingIndex == 5:
+            Default_Display = (Default_Display + 1) % 10
+            SettingValues[SettingIndex] = DisplayText[Default_Display]
+            Settings["Default_Display"] = Default_Display
+            Save_Config(Settings)

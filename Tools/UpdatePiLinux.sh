@@ -7,7 +7,7 @@ src_dir=$(pwd)
 dest_dir="/consult_box"
 
 # Set your Raspberry Pi's IP address
-rpi_ip="192.168.7.181"
+rpi_ip="192.168.6.91"
 
 # Set your Raspberry Pi's username
 rpi_user="kylec"

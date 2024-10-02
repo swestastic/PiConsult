@@ -1,0 +1,20 @@
+{
+    "Units_Speed": "MPH",
+    "Units_Temp": "F",
+
+    "Stock_Final": 4.083,
+    "New_Final": 4.083,
+
+    "Stock_Tire_Height": 24.9,
+    "New_Tire_Height": 25.1,
+
+    "Stock_Tire_AR": 0.75,
+    "New_Tire_AR": 0.75,
+
+    "Stock_Tire_Diam": 24.9,
+    "New_Tire_Diam": 25.1,
+
+    "Default_Display": 0,
+
+    "Injector_Size": 0
+}
