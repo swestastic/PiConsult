@@ -2,7 +2,7 @@
 
 ## Description
 
-This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested.
+This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ compatibility is not tested yet
 
 ## Current Functionality
 
@@ -16,6 +16,18 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Injector duty cycle percentage
   - Ignition timing
 
+## In Testing
+
+- PWM output for Flock Gauge (Requires external DAC)
+- Onboard settings mode with the following adjustments
+  - Gear ratio (factory and adjusted)
+  - Tire size (factory and adjusted)
+  - Injector size (factory and adjusted)
+  <!-- Idk how injector duty cycle behaves with a chipped ECU, which you would need if you're running different injector sizes --!>
+  - Speed units: MPH or KPH
+  - Temperature units: Farenheight or Celsius
+- Peak values saved and viewable with button press
+
 ## Future Functionality
 
 - More data able to be displayed
@@ -23,7 +35,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - TPS open/closed
   - Clutch switch on/off
   - Starter signal on/off
-- Peak values saved and viewable with button press
+  - Instant and average MPG based on rpm, speed, injector duty cycle, and injector size
 - Data Trouble Codes (DTC) reading and resetting
 - Test mode
   - Power Balance
@@ -32,23 +44,14 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Clear fuel self learn
   - Probably others
 - Blinking light or screen flash for RPM shift light or overheating
-- Builtin settings mode with adjustments for the following
-  - Gear ratio (factory and adjusted)
-  - Tire size (factory and adjusted)
-  - Injector size (factory and adjusted)
-  <!-- Idk how injector duty cycle behaves with a chipped ECU, which you would need if you're running different injector sizes --!>
-  - Speed units: MPH or KPH
-  - Temperature units: Farenheight or Celsius
 - Data logging to SD card
 - WiFi functionality to read data from phone
-- Instant and average MPG based on rpm, speed, injector duty cycle, and injector size
-- Safe shutdown button (clear and power off the screen, then send halt command to ECU, halt the loops and shutdown the pi)
-- DC output (PWM -> DAC) to daisy chain PiConsult to Flock gauge or similar
+
+- Safe shutdowns (OLED screen is unhappy with random power changes, TFT/LCD display coming eventually)
 
 ## Known Bugs
 
 - Data is displayed on screen as floats (e.g. rpm shows as 750.0, 3500.0, etc). I think this has to do with WriteText() and the string conversion for the numbers maybe?
-- Peak data only shows for one frame when the button is pressed
 - Some values may be displayed incorrectly. Need to evaluate and confirm accuracy from the data received
 
 ## Prerequisites
@@ -62,6 +65,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 - [4x two pin 6x6x5 buttons](https://www.amazon.com/dp/B07X8T9D2Q)
 
 ## Software Installation
+
 1. Set up your Pi with Raspbian or a similar OS (enabling SSH may be helpful for testing or debugging!)
 1. Grab the latest release from [Releases](github.com/swestastic/PiConsult/releases)
 2. Install the required Python packages on the Pi: `pip install -r requirements.txt`
@@ -102,12 +106,10 @@ Turn on the car and you should be ready to go! Make sure to configure settings a
 
 INSERT PICTURE OF RUNNING ASSEMBLY MOUNTED TO CAR
 
-
-
 ## Usage
 
 1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
-2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal.
+2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable power with `sudo chmod +x ConsultStart.sh`
 3. The script will start recording data over serial and display it on the SPI display.
 
 ## Configuration

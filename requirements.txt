@@ -1,0 +1,6 @@
+pyserial
+Pillow
+gpiozero
+numpy
+smbus
+spidev
