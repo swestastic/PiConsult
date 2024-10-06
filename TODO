@@ -5,7 +5,7 @@
 - Order LCD screen and try that since OLED has been unreliable
   - This will require changes to SolidWorks design because it will be a 1.9" screen instead of 2.42"
 
-- ESP32, micropython? Or try to rewrite in C++ 
+- ESP32, micropython? Or try to rewrite in C++
 
 - Wire in additional two buttons
 
@@ -27,4 +27,6 @@
 
 - Figure out why data is being displayed as floats on oled
 
-- PWM output for rpm, eventually make configurable for what to output via the pwm pin
+- Make PWM Configurable in settings
+
+- Bypass connection if not plugged in

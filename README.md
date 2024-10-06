@@ -67,10 +67,10 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 ## Software Installation
 
 1. Set up your Pi with Raspbian or a similar OS (enabling SSH may be helpful for testing or debugging!)
-1. Grab the latest release from [Releases](github.com/swestastic/PiConsult/releases)
-2. Install the required Python packages on the Pi: `pip install -r requirements.txt`
-3. Set ConsultStart.sh to run at boot
-4. It is recommended to look into optimizing boot times on the Pi for a better user experience. Do your own research on this.
+2. Grab the latest release from [Releases](github.com/swestastic/PiConsult/releases)
+3. Install the required Python packages on the Pi: `pip install -r requirements.txt`
+4. Set ConsultStart.sh to run at boot
+5. It is recommended to look into optimizing boot times on the Pi for a better user experience. Do your own research on this.
 
 ## Assembly and Installation
 
