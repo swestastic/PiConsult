@@ -27,6 +27,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Speed units: MPH or KPH
   - Temperature units: Farenheight or Celsius
 - Peak values saved and viewable with button press
+- Bypass ECU connection for testing
 
 ## Future Functionality
 

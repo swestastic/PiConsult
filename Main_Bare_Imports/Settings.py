@@ -1,9 +1,9 @@
 import json
 
 # Load settings from the config file
-def Load_Config():
+def Load_Config(FILE):
     try:
-        with open('configJSON.json', 'r') as file:
+        with open(FILE, 'r') as file:
             return json.load(file)
     except FileNotFoundError:
         print("Config file not found, using default settings")
@@ -29,6 +29,6 @@ def Load_Config():
         }
 
 # Save settings to the config file
-def Save_Config(settings):
-    with open('configJSON.json', 'w') as file:
+def Save_Config(FILE,settings):
+    with open(FILE, 'w') as file:
         json.dump(settings, file)

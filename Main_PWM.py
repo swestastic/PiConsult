@@ -32,7 +32,7 @@ SettingButton = Button(26)
 
 # General Configs
 
-Settings = Load_Config()
+Settings = Load_Config('configJSON.json')
 
 Units_Speed = Settings["Units_Speed"]
 Units_Temp = Settings["Units_Temp"]
@@ -219,26 +219,26 @@ while SETTINGS_THREAD == True:
                 Units_Speed = 'KPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
             elif Units_Speed == 'KPH':
                 Units_Speed = 'MPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
         if SettingIndex == 1:
             if Units_Temp == 'F':
                 Units_Temp = 'C'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
             elif Units_Temp == 'C':
                 Units_Temp = 'F'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
         if SettingIndex == 2:
             pass
@@ -253,4 +253,4 @@ while SETTINGS_THREAD == True:
             Default_Display = (Default_Display + 1) % 10
             SettingValues[SettingIndex] = DisplayText[Default_Display]
             Settings["Default_Display"] = Default_Display
-            Save_Config(Settings)
+            Save_Config('configJSON.json',Settings)

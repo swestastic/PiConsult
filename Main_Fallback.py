@@ -30,7 +30,7 @@ SettingButton = Button(26)
 # PowerButton.hold_time = 2 # Hold for 2 seconds to shut down
 
 # General Configs
-Settings = Load_Config()
+Settings = Load_Config('configJSON.json')
 
 Units_Speed = Settings["Units_Speed"]
 Units_Temp = Settings["Units_Temp"]
@@ -77,6 +77,8 @@ def ECU_Connect(PORT,ECU_CONNECTED):
     
     while ECU_CONNECTED == False:
         if DisplayButton.is_pressed or PeakButton.is_pressed or SettingButton.is_pressed:
+            BYPASSED = True
+            PeakValues[:] = 1 # Set these to one so we can test peak functionality
             break # Press any button to stop connection attempts
         
         try:
@@ -180,11 +182,16 @@ while PORT is None:
 
 ECU_CONNECTED, BYPASSED = ECU_Connect(PORT,ECU_CONNECTED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
 
-if BYPASSED == True:
-    # If we bypassed the ECU connection go into settings mode
+while BYPASSED == True: # Bypass ECU connection so we can test functions
     WriteText('Connection Bypassed','Entering Settings...')
     time.sleep(0.1)
-    SETTINGS_THREAD = True
+    WriteText(DisplayText[DisplayIndex],str(DisplayValues[DisplayIndex])+str(Units[DisplayIndex]))
+
+    DisplayButton.when_pressed = Increment_Display
+    if PeakButton.is_pressed:
+        Show_Peak()
+    if SettingButton.is_pressed:
+        SETTINGS_THREAD = True
 
 if ECU_CONNECTED == True:
     # if Mode == 0: # NOTE Placeholder for when we set up the modes
@@ -222,26 +229,26 @@ while SETTINGS_THREAD == True:
                 Units_Speed = 'KPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
             elif Units_Speed == 'KPH':
                 Units_Speed = 'MPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
         if SettingIndex == 1:
             if Units_Temp == 'F':
                 Units_Temp = 'C'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
             elif Units_Temp == 'C':
                 Units_Temp = 'F'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config(Settings)
+                Save_Config('configJSON.json',Settings)
 
         if SettingIndex == 2:
             pass
@@ -256,4 +263,4 @@ while SETTINGS_THREAD == True:
             Default_Display = (Default_Display + 1) % 10
             SettingValues[SettingIndex] = DisplayText[Default_Display]
             Settings["Default_Display"] = Default_Display
-            Save_Config(Settings)
+            Save_Config('configJSON.json',Settings)
