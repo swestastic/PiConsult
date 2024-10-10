@@ -13,7 +13,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Battery voltage
   - MAF voltage
   - AAC duty cycle percentage
-  - Injector duty cycle percentage
+  - Injector timing
   - Ignition timing
 
 ## In Testing
@@ -22,12 +22,11 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 - Onboard settings mode with the following adjustments
   - Gear ratio (factory and adjusted)
   - Tire size (factory and adjusted)
-  - Injector size (factory and adjusted)
-  <!-- Idk how injector duty cycle behaves with a chipped ECU, which you would need if you're running different injector sizes --!>
   - Speed units: MPH or KPH
   - Temperature units: Farenheight or Celsius
 - Peak values saved and viewable with button press
 - Bypass ECU connection for testing
+- Screen flash for overheating/rev limiter
 
 ## Future Functionality
 
@@ -61,7 +60,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 - [WaveShare OLED 2.42in screen](https://www.waveshare.com/wiki/2.42inch_OLED_Module)
 - Python 3.x with packages from `requirements.txt`
 - [Nissan Consult Cable](https://conceptzperformance.com/plms-developments-plms-nissan-consult-interface-usb-cable-nistune-datscan-etc-1005_p_5664.php) (There are cheaper consult readers on eBay for $15-$20, but I have not tested these)
-- 3D Printer for printing the 3 included STL files (it is recommended with filament that will last inside of a car, such as PETG, ABS, or ASA)
+- 3D Printer for printing the 3 included STL files (it is recommended to use a filament that will last inside of a car, such as PETG, ABS, or ASA, especially if it is parked outside)
 - 4x Screws (Need to confirm size on these)
 - [4x two pin 6x6x5 buttons](https://www.amazon.com/dp/B07X8T9D2Q)
 

@@ -7,7 +7,7 @@ REM Set the destination directory path on Raspberry Pi
 set dest_dir=consult_box
 
 REM Set your Raspberry Pi's IP address
-set rpi_ip=192.168.6.91
+set rpi_ip=192.168.6.38
 
 REM Set your Raspberry Pi's username
 set rpi_user=kylec

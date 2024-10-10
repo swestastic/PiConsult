@@ -54,20 +54,20 @@ class ReadStream(threading.Thread):
             #     continue
                 
             try:
-                self.SPEED_Value = self.convertToSpeed(int(dataList[-2]))
-                self.RPM_Value = self.convertToRev(int(dataList[-1]))
+                self.SPEED_Value = int(self.convertToSpeed(int(dataList[-2])))
+                self.RPM_Value = int(self.convertToRev(int(dataList[-1])))
                 self.TEMP_Value = self.convertToTemp(int(dataList[0]))
                 self.BATT_Value = self.convertToBattery(float(dataList[1]))
                 self.TPS_Value = self.convertToTPS(float(dataList[2])) # Not sure if this is the correct value in dataList
                 self.MAF_Value = self.convertToMAF(int(dataList[5]))
                 self.AAC_Value = self.convertToAAC(int(dataList[8]))
                 self.INJ_Value = self.convertToInjection(int(dataList[6])) # Not sure if this is the correct value in dataList
-                self.TIM_Value = self.convertToTiming(int(dataList[9])) # Not sure if this is the correct value in dataList
+                self.TIM_Value = int(self.convertToTiming(int(dataList[9]))) # Not sure if this is the correct value in dataList
                 self.TPS_Value = self.convertToTPS(float(dataList[2])) # Not sure if this is the correct value in dataList
                 self.FUEL_Value = self.convertToFuel(float(dataList[-2]),float(dataList[6]))
 
             except (ValueError, IndexError):
-                   pass
+                pass
             time.sleep(0.002)
         return self.SPEED_Value, self.RPM_Value, self.TEMP_Value, self.BATT_Value, self.TPS_Value, self.MAF_Value, self.AAC_Value, self.INJ_Value, self.TIM_Value
 

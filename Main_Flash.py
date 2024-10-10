@@ -11,20 +11,6 @@ from gpiozero import Button # type: ignore
 import numpy as np
 from Resources import dtc_dict as DTC_DICT
 from Main_Bare_Imports.Read import ReadStream
-import socket
-
-def get_local_ip():
-    try:
-        # Connect to an external IP to find the local IP address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))  # Google DNS server, doesn't actually send data
-        ip_addr = s.getsockname()[0]
-        s.close()
-        return ip_addr
-    except Exception as e:
-        return f"Error occurred: {e}"
-
-IPAddr = get_local_ip()
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -44,6 +30,7 @@ SettingButton = Button(26)
 # PowerButton.hold_time = 2 # Hold for 2 seconds to shut down
 
 # General Configs
+
 Settings = Load_Config('configJSON.json')
 
 Units_Speed = Settings["Units_Speed"]
@@ -68,37 +55,39 @@ def WriteText(upper,lower):
     image = image.rotate(180) 
     disp.ShowImage(disp.getbuffer(image))
 
-def PortConnect(PORT,BYPASSED):
-    global IPAddr
+def ScreenFlash(text):
+    # Flashes the screen with the given text
+    image = Image.new('1', (128, 64), 255)
+    draw = ImageDraw.Draw(image)
+    draw.text((20,0),str(text), font = font1, fill = 0)
+    image = image.rotate(180) 
+    disp.ShowImage(disp.getbuffer(image))
+
+def PortConnect(PORT):
     # Tries to connect to serial port
-    if DisplayButton.is_pressed or PeakButton.is_pressed:
-        print('BYPASSED!!!!')
-        BYPASSED = True
-        PeakValues[:] = 1 # Set these to one so we can test peak functionality
-        print('BYPASSED!!!!')
-    WriteText('Connecting...',IPAddr)
-            
+
     try:
         PORT = serial.Serial('/dev/ttyUSB0', 9600, timeout=None)
     except OSError:
         if PORT:
             if PORT.is_open:  # Check if PORT is not None and is open
-                WriteText('Port is open',str(IPAddr))
+                WriteText('Port open',None)
         else:
             if PORT:
                 PORT.open()  # port is not none but is closed
             else:
-                WriteText('Init Fail',str(IPAddr))  # Handle the case where PORT is still None
-    return PORT,BYPASSED
+                WriteText('Init Fail',None)  # Handle the case where PORT is still None
+    return PORT
 
-def ECU_Connect(PORT,ECU_CONNECTED,BYPASSED):
+def ECU_Connect(PORT,ECU_CONNECTED):
     # Attempts to connect to the ECU using the initialization sequence.
     # Then depending on which mode we want we can send the mode-specific
     # initialization sequence
     
-    while ECU_CONNECTED == False and BYPASSED == False:
+    while ECU_CONNECTED == False:
         try:
-
+            WriteText('Connecting...','Please wait')
+            
             PORT.flushInput()
             WriteText('Input flushed','Please wait')
             time.sleep(0.1)
@@ -119,7 +108,7 @@ def ECU_Connect(PORT,ECU_CONNECTED,BYPASSED):
         except ValueError:
             # PORT.open()
             print('Value error')
-    return ECU_CONNECTED, BYPASSED
+    return ECU_CONNECTED
 
 def Increment_Display():
     # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
@@ -137,8 +126,19 @@ def Increment_Settings():
 
 def Show_Peak():
     global DisplayIndex
-    WriteText(str(DisplayText[DisplayIndex])+' PEAK',str(PeakValues[DisplayIndex])+str( Units[DisplayIndex]))
+    WriteText('Peak'+str(DisplayText[DisplayIndex]),str(PeakValues[DisplayIndex])+str(Units[DisplayIndex]))
+    time.sleep(1.5)
+
+def Shutdown():
+    global disp, READ_THREAD, DTC_THREAD
+    # Shuts down the device
+    WriteText('Shutting down',None) 
     time.sleep(1)
+    disp.clear()
+    disp.module_exit()
+    READ_THREAD = False
+    DTC_THREAD = False
+    os.system('sudo shutdown now')
 
 if config.Units_Speed == 1:
     Speed_Units = 'MPH'
@@ -168,7 +168,6 @@ DTCIndex = 0
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
 
-BYPASSED = False
 READ_THREAD = False
 DTC_THREAD = False
 SETTINGS_THREAD = False
@@ -177,33 +176,14 @@ TESTS_THREAD = False
 PORT = None
 ECU_CONNECTED = False
 
-# while BYPASSED == False:
-#     if DisplayButton.is_pressed or PeakButton.is_pressed:
-#         BYPASSED = True
-#         print('BYPASSED!!!!')
-#         PeakValues[:] = 1
-
-while PORT is None and BYPASSED == False:
-    PORT,BYPASSED = PortConnect(PORT,BYPASSED)
+while PORT is None:
+    PORT = PortConnect(PORT)
     # time.sleep(0.1)
-    WriteText('Connecting...',str(IPAddr))
-    print('PORTCONNECT')
+    WriteText('Connecting...','Please wait')
 
 ####################################### Main loop #######################################
 
-ECU_CONNECTED, BYPASSED = ECU_Connect(PORT,ECU_CONNECTED,BYPASSED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
-
-if BYPASSED == True: # Bypass ECU connection so we can test functions
-    WriteText('Connection Bypassed','Entering Settings...')
-    time.sleep(0.1)
-    while BYPASSED == True:
-        WriteText(DisplayText[DisplayIndex],str(DisplayValues[DisplayIndex])+str(Units[DisplayIndex]))
-
-        DisplayButton.when_pressed = Increment_Display
-        if PeakButton.is_pressed:
-            Show_Peak()
-        if SettingButton.is_pressed:
-            SETTINGS_THREAD = True
+ECU_CONNECTED = ECU_Connect(PORT,ECU_CONNECTED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
 
 if ECU_CONNECTED == True:
     # if Mode == 0: # NOTE Placeholder for when we set up the modes
@@ -221,6 +201,14 @@ while READ_THREAD == True:
     DisplayButton.when_pressed = Increment_Display
     if PeakButton.is_pressed:
         Show_Peak()
+
+    while R.RPM_Value > 7200:
+        ScreenFlash('SHIFT!')
+
+    while R.Temp_Value > 200:
+        ScreenFlash('OVERHEAT!')
+
+    # PowerButton.when_held = Shutdown
 
     time.sleep(0.02)
 

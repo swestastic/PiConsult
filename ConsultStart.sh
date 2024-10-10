@@ -4,4 +4,4 @@
 
 cd /
 cd home/kylec/consult_box
-sudo python3 Main.py
+sudo python3 Main_Fallback.py
