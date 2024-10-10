@@ -2,7 +2,7 @@
 
 ## Description
 
-This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ compatibility is not tested yet
+This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ (OBD2) compatibility is not tested yet
 
 ## Current Functionality
 

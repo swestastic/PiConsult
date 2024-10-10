@@ -11,6 +11,22 @@ from gpiozero import Button # type: ignore
 import numpy as np
 from Resources import dtc_dict as DTC_DICT
 from Main_Bare_Imports.Read import ReadStream
+from Main_Bare_Imports.Flash import FlashText, Center_Text
+import socket
+
+def get_local_ip():
+    try:
+        # Connect to an external IP to find the local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google DNS server, doesn't actually send data
+        ip_addr = s.getsockname()[0]
+        s.close()
+        return ip_addr
+    except Exception as e:
+        return 'No Internet'
+        # return f"Error occurred: {e}"
+
+IPAddr = get_local_ip()
 
 # OLED screen info
 Device_SPI = config.Device_SPI
@@ -24,25 +40,25 @@ font2 = ImageFont.truetype('Font.ttc', 20)
 DisplayButton = Button(6) #switch displayed values (i.e. speed, rpm, etc. Or in settings mode switch which setting is shown)
 PeakButton = Button(16) # Show peak value of current mode
 SettingButton = Button(26)
-
 # ModeButton = Button() # Switch between modes
-# PowerButton = Button() # Power button to turn off the device
-# PowerButton.hold_time = 2 # Hold for 2 seconds to shut down
 
 # General Configs
+CONF = 'configJSON.json' # config file
+Settings = Load_Config(CONF)
 
-Settings = Load_Config('configJSON.json')
-
-Units_Speed = Settings["Units_Speed"]
-Units_Temp = Settings["Units_Temp"]
-Stock_Tire_Height = Settings["Stock_Tire_Height"]
-Stock_Tire_AR = Settings["Stock_Tire_AR"]
-Stock_Tire_Diam = Settings["Stock_Tire_Diam"]
-New_Tire_Height = Settings["New_Tire_Height"]
-New_Tire_AR = Settings["New_Tire_AR"]
-New_Tire_Diam = Settings["New_Tire_Diam"]
-Default_Display = Settings["Default_Display"]
-Injector_Size = Settings["Injector_Size"]
+Units_Speed = Settings["Units_Speed"] # Farenheit or Celsius
+Units_Temp = Settings["Units_Temp"] # MPH or KPH
+Stock_Tire_Height = Settings["Stock_Tire_Height"] # Stock tire height
+Stock_Tire_AR = Settings["Stock_Tire_AR"] # Stock tire aspect ratio
+Stock_Tire_Diam = Settings["Stock_Tire_Diam"] # Stock tire diameter
+New_Tire_Height = Settings["New_Tire_Height"] # New tire height
+New_Tire_AR = Settings["New_Tire_AR"] # New tire aspect ratio
+New_Tire_Diam = Settings["New_Tire_Diam"] # New tire diameter
+Default_Display = Settings["Default_Display"] # Default display when in READ_THREAD mode
+Injector_Size = Settings["Injector_Size"] # Injector size
+Coolant_Warning = Settings["Coolant_Warning"] # Coolant warning temperature
+RPM_Warning = Settings["RPM_Warning"] # RPM warning value
+PWM_Index = Settings["PWM_Index"] # PWM index, 999 is off
 
 def WriteText(upper,lower): 
     # Writes text to the display
@@ -55,31 +71,34 @@ def WriteText(upper,lower):
     image = image.rotate(180) 
     disp.ShowImage(disp.getbuffer(image))
 
-def PortConnect(PORT):
+def PortConnect(PORT,BYPASSED, IPAddr):
     # Tries to connect to serial port
-
+    if DisplayButton.is_pressed or PeakButton.is_pressed:
+        BYPASSED = True
+        PeakValues[:] = 1 # Set these to one so we can test peak functionality
+    WriteText('Connecting...',IPAddr)
+            
     try:
-        PORT = serial.Serial('/dev/ttyUSB0', 9600, timeout=None)
+        PORT,BYPASSED = serial.Serial('/dev/ttyUSB0', 9600, timeout=None)
     except OSError:
         if PORT:
             if PORT.is_open:  # Check if PORT is not None and is open
-                WriteText('Port is open',None)
+                WriteText('Port is open',str(IPAddr))
         else:
             if PORT:
                 PORT.open()  # port is not none but is closed
             else:
-                WriteText('Init Fail',None)  # Handle the case where PORT is still None
-    return PORT
+                WriteText('Init Fail',str(IPAddr))  # Handle the case where PORT is still None
+    return PORT,BYPASSED
 
-def ECU_Connect(PORT,ECU_CONNECTED):
+def ECU_Connect(PORT,ECU_CONNECTED,BYPASSED):
     # Attempts to connect to the ECU using the initialization sequence.
     # Then depending on which mode we want we can send the mode-specific
     # initialization sequence
     
-    while ECU_CONNECTED == False:
+    while ECU_CONNECTED == False and BYPASSED == False:
         try:
-            WriteText('Connecting...','Please wait')
-            
+
             PORT.flushInput()
             WriteText('Input flushed','Please wait')
             time.sleep(0.1)
@@ -95,12 +114,12 @@ def ECU_Connect(PORT,ECU_CONNECTED):
                 ECU_CONNECTED = True
 
             else: # NOTE might be able to remove this
-                PORT = PortConnect(PORT)
+                PORT,BYPASSED = PortConnect(PORT,BYPASSED,IPAddr)
 
         except ValueError:
             # PORT.open()
             print('Value error')
-    return ECU_CONNECTED
+    return ECU_CONNECTED, BYPASSED
 
 def Increment_Display():
     # Increments the display index, which tells us what to show on the screen in READ_THEAD mode
@@ -116,21 +135,9 @@ def Increment_Settings():
     global SettingIndex
     SettingIndex = (SettingIndex + 1) % 6
 
-def Show_Peak():
-    global DisplayIndex
-    WriteText('Peak'+str(DisplayText[DisplayIndex]),str(PeakValues[DisplayIndex])+str(Units[DisplayIndex]))
+def Show_Peak(DisplayIndex):
+    WriteText(str(DisplayText[DisplayIndex])+' PEAK',str(PeakValues[DisplayIndex])+str(Units[DisplayIndex]))
     time.sleep(1.5)
-
-def Shutdown():
-    global disp, READ_THREAD, DTC_THREAD
-    # Shuts down the device
-    WriteText('Shutting down',None) 
-    time.sleep(1)
-    disp.clear()
-    disp.module_exit()
-    READ_THREAD = False
-    DTC_THREAD = False
-    os.system('sudo shutdown now')
 
 if config.Units_Speed == 1:
     Speed_Units = 'MPH'
@@ -152,7 +159,7 @@ SettingText = ['Speed Units','Temp Units','Final Drive', 'Tire Size', 'Injector 
 SettingValues = [Units_Speed,Units_Temp,config.Combined_Ratio,New_Tire_Height,config.Injector_Size,DisplayText[Default_Display]]
 
 PeakValues = np.zeros(10)
-Units = ['RPM',Speed_Units,'V','%',Temp_Units,'V','%','deg','%','EFF']
+Units = ['RPM',Speed_Units,'V','%',Temp_Units,'V','%','deg','V','EFF']
 DTC_Codes = []
 DTC_Counts = []
 DTCIndex = 0
@@ -160,6 +167,7 @@ DTCIndex = 0
 disp = OLED_2in42.OLED_2in42(spi_freq = 1000000)
 disp.Init()
 
+BYPASSED = False
 READ_THREAD = False
 DTC_THREAD = False
 SETTINGS_THREAD = False
@@ -168,14 +176,26 @@ TESTS_THREAD = False
 PORT = None
 ECU_CONNECTED = False
 
-while PORT is None:
-    PORT = PortConnect(PORT)
+while PORT is None and BYPASSED == False:
+    PORT,BYPASSED = PortConnect(PORT,BYPASSED,IPAddr)
     # time.sleep(0.1)
-    WriteText('Connecting...','Please wait')
+    WriteText('Connecting...',IPAddr)
 
 ####################################### Main loop #######################################
 
-ECU_CONNECTED = ECU_Connect(PORT,ECU_CONNECTED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
+ECU_CONNECTED, BYPASSED = ECU_Connect(PORT,ECU_CONNECTED,BYPASSED) # This will connect to the ECU using initialization sequence '0xFF,0xFF,0xEF'
+
+if BYPASSED == True: # Bypass ECU connection so we can test functions
+    WriteText('Connection Bypassed','Entering Settings...')
+    time.sleep(0.1)
+    while BYPASSED == True:
+        WriteText(DisplayText[DisplayIndex],str(DisplayValues[DisplayIndex])+str(Units[DisplayIndex]))
+
+        DisplayButton.when_pressed = Increment_Display
+        if PeakButton.is_pressed:
+            Show_Peak(DisplayIndex)
+        if SettingButton.is_pressed:
+            SETTINGS_THREAD = True
 
 if ECU_CONNECTED == True:
     # if Mode == 0: # NOTE Placeholder for when we set up the modes
@@ -192,9 +212,13 @@ while READ_THREAD == True:
 
     DisplayButton.when_pressed = Increment_Display
     if PeakButton.is_pressed:
-        Show_Peak()
+        Show_Peak(DisplayIndex)
 
-    # PowerButton.when_held = Shutdown
+    if R.RPM_Value > RPM_Warning:
+        FlashText("REV LIMIT!", font1, disp, flashes=6, flash_interval=0.125)
+
+    if R.TEMP_Value > Coolant_Warning:
+        FlashText("OVERHEAT!", font1, disp, flashes=6, flash_interval=0.125)
 
     time.sleep(0.02)
 
@@ -213,26 +237,26 @@ while SETTINGS_THREAD == True:
                 Units_Speed = 'KPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config('configJSON.json',Settings)
+                Save_Config(CONF,Settings)
 
             elif Units_Speed == 'KPH':
                 Units_Speed = 'MPH'
                 SettingValues[SettingIndex] = Units_Speed
                 Settings["Units_Speed"] = Units_Speed
-                Save_Config('configJSON.json',Settings)
+                Save_Config(CONF,Settings)
 
         if SettingIndex == 1:
             if Units_Temp == 'F':
                 Units_Temp = 'C'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config('configJSON.json',Settings)
+                Save_Config(CONF,Settings)
 
             elif Units_Temp == 'C':
                 Units_Temp = 'F'
                 SettingValues[SettingIndex] = Units_Temp
                 Settings["Units_Temp"] = Units_Temp
-                Save_Config('configJSON.json',Settings)
+                Save_Config(CONF,Settings)
 
         if SettingIndex == 2:
             pass
@@ -247,4 +271,4 @@ while SETTINGS_THREAD == True:
             Default_Display = (Default_Display + 1) % 10
             SettingValues[SettingIndex] = DisplayText[Default_Display]
             Settings["Default_Display"] = Default_Display
-            Save_Config('configJSON.json',Settings)
+            Save_Config(CONF,Settings)

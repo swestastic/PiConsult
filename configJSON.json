@@ -16,5 +16,11 @@
 
     "Default_Display": 0,
 
-    "Injector_Size": 0
+    "Injector_Size": 0,
+
+    "Coolant_Warning": 200,
+
+    "RPM_Warning": 7000,
+
+    "PWM_Index": 999
 }
