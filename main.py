@@ -231,8 +231,8 @@ while SETTINGS_THREAD == True:
 
     DisplayButton.when_pressed = Increment_Settings
     
-    if SettingButton.is_pressed:
-        if SettingIndex == 0:
+    if SettingButton.is_pressed: # change what's displayed on the screen
+        if SettingIndex == 0: # Speed Units
             if Units_Speed == 'MPH':
                 Units_Speed = 'KPH'
                 SettingValues[SettingIndex] = Units_Speed
@@ -245,7 +245,7 @@ while SETTINGS_THREAD == True:
                 Settings["Units_Speed"] = Units_Speed
                 Save_Config(CONF,Settings)
 
-        if SettingIndex == 1:
+        if SettingIndex == 1: # Temp Units
             if Units_Temp == 'F':
                 Units_Temp = 'C'
                 SettingValues[SettingIndex] = Units_Temp
@@ -258,17 +258,27 @@ while SETTINGS_THREAD == True:
                 Settings["Units_Temp"] = Units_Temp
                 Save_Config(CONF,Settings)
 
-        if SettingIndex == 2:
+        if SettingIndex == 2: # Number of display Items
             pass
 
-        if SettingIndex == 3:
-            pass
-
-        if SettingIndex == 4:
-            pass
-
-        if SettingIndex == 5:
+        if SettingIndex == 3: # Default Display
             Default_Display = (Default_Display + 1) % 10
             SettingValues[SettingIndex] = DisplayText[Default_Display]
             Settings["Default_Display"] = Default_Display
             Save_Config(CONF,Settings)
+
+        if SettingIndex == 4: # Speed Correction 
+            pass
+
+        if SettingIndex == 5: # TPS Calibration
+            pass
+
+        if SettingIndex == 6: # Data Logging On/Off
+            pass
+
+        if SettingIndex == 7: # PWM On/Off
+            pass
+
+        if SettingIndex == 8: # WiFi On/Off
+            pass
+
