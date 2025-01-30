@@ -69,7 +69,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 1. Set up your Pi with Raspbian or a similar OS (enabling SSH may be helpful for testing or debugging!)
 2. Grab the latest release from [Releases](github.com/swestastic/PiConsult/releases)
 3. Install the required Python packages on the Pi: `pip install -r requirements.txt`
-4. Set ConsultStart.sh to run at boot
+4. Set ConsultStart.sh to run at boot (I used systemd method)
 5. It is recommended to look into optimizing boot times on the Pi for a better user experience. Do your own research on this.
 
 ## Assembly and Installation
@@ -111,6 +111,7 @@ INSERT PICTURE OF RUNNING ASSEMBLY MOUNTED TO CAR
 1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
 2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable power with `sudo chmod +x ConsultStart.sh`
 3. The script will start recording data over serial and display it on the SPI display.
+4. You can set up SSH to connect to the device once it is on your network. The default address is kylec@consult.local 
 
 ## Configuration
 

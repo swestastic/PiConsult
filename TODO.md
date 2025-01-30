@@ -5,20 +5,22 @@
 - Order LCD screen and try that since OLED has been unreliable
   - This will require changes to SolidWorks design because it will be a 1.9" screen instead of 2.42"
 - ESP32, micropython? Or try to rewrite in C++
-- Wire in additional two buttons
+- Shrink size of case
+- Make pegs better
+- Fix labeling on faceplate
 
 ## Software
 
+- Hardware key combo to reset screen
 - Faster boot times for RPi
 - Implement code from SettingTest.py to have a functional settings mode
   - Update definitions in Read.py to generate correct data after changing units without needing a reboot
   - Update Read.py and main_bare_with_imports.py to refer to configJSON.json for values instead of config.py
-- Choose GPIO pins for 2 additional buttons
 - Test DTC and make sure it communicates with ECU correctly
 - Figure out calculations for fuel efficiency. MPG might be on the right track, need to swap Km/L to L/100Km
 - Figure out why data is being displayed as floats on oled
 - Make PWM Configurable in settings
-- Bypass connection if not plugged in
+<!-- - Bypass connection if not plugged in -->
 - Update Settings Tree
   - Units
     - Temp
