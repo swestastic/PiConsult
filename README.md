@@ -1,8 +1,10 @@
-# PiConsult by Swestastic
+# PiConsult
 
 ## Description
 
 This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ (OBD2) compatibility is not tested yet. The logic is the same as my desktop app, [PyConsult](https://github.com/swestastic/PyConsult), but now it comes in a small form factor which you can leave in your car!
+
+![assembly.gif](images/assembly.gif)
 
 ## Current Functionality
 
