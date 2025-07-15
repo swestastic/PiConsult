@@ -32,3 +32,8 @@ def Load_Config(FILE):
 def Save_Config(FILE,settings):
     with open(FILE, 'w') as file:
         json.dump(settings, file)
+
+def Increment_Settings():
+    # Increments the settings index, which tells us what to show on the screen in SETTINGS_THREAD mode
+    global SettingIndex
+    SettingIndex = (SettingIndex + 1) % 6

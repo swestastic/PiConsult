@@ -5,14 +5,14 @@
 import sys,os,time,serial,threading,datetime,json #type: ignore
 from Resources import config
 from flask import Flask, render_template, request, redirect, url_for
-from Main_Bare_Imports.Settings import Load_Config, Save_Config
+from Utils.Settings import Load_Config, Save_Config
 import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
 import numpy as np
 from Resources import dtc_dict as DTC_DICT
-from Main_Bare_Imports.Read import ReadStream
-from Main_Bare_Imports.PWM import PWMOutput
+from Utils.Read import ReadStream
+from Utils.PWM import PWMOutput
 
 # Web UI
 app = Flask(__name__)
@@ -22,8 +22,8 @@ Device_SPI = config.Device_SPI
 Device_I2C = config.Device_I2C
 OLED_WIDTH   = 128
 OLED_HEIGHT  = 64
-font1 = ImageFont.truetype('Font.ttc', 18)
-font2 = ImageFont.truetype('Font.ttc', 20)
+font1 = ImageFont.truetype('Resources/Font.ttc', 18)
+font2 = ImageFont.truetype('Resources/Font.ttc', 20)
 
 # Button configs
 DisplayButton = Button(6) #switch displayed values (i.e. speed, rpm, etc. Or in settings mode switch which setting is shown)
@@ -36,7 +36,7 @@ SettingButton = Button(26)
 
 # General Configs
 
-Settings = Load_Config('configJSON.json')
+Settings = Load_Config('Resources/configJSON.json')
 
 Units_Speed = Settings["Units_Speed"]
 Units_Temp = Settings["Units_Temp"]

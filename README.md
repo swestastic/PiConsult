@@ -2,7 +2,7 @@
 
 ## Description
 
-This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ (OBD2) compatibility is not tested yet
+This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ (OBD2) compatibility is not tested yet. The logic is the same as my desktop app, [PyConsult](https://github.com/swestastic/PyConsult), but now it comes in a small form factor which you can leave in your car!
 
 ## Current Functionality
 
@@ -23,7 +23,7 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Gear ratio (factory and adjusted)
   - Tire size (factory and adjusted)
   - Speed units: MPH or KPH
-  - Temperature units: Farenheight or Celsius
+  - Temperature units: Fahrenheit or Celsius
 - Peak values saved and viewable with button press
 - Bypass ECU connection for testing
 - Screen flash for overheating/rev limiter
@@ -43,16 +43,10 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
   - Fuel pump on/off
   - Clear fuel self learn
   - Probably others
-- Blinking light or screen flash for RPM shift light or overheating
 - Data logging to SD card
-- WiFi functionality to read data from phone
+- WiFi functionality to WebUI read data from phone
 
-- Safe shutdowns (OLED screen is unhappy with random power changes, TFT/LCD display coming eventually)
-
-## Known Bugs
-
-- Data is displayed on screen as floats (e.g. rpm shows as 750.0, 3500.0, etc). I think this has to do with WriteText() and the string conversion for the numbers maybe?
-- Some values may be displayed incorrectly. Need to evaluate and confirm accuracy from the data received
+- Safe shutdowns (OLED screen is unhappy with random power changes, TFT/LCD coming eventually)
 
 ## Prerequisites
 
@@ -74,44 +68,46 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ## Assembly and Installation
 
+*I still have to get photos, sorry!*
+
 First connect all of your wires according to the following pinout:
 
-INSERT PICTURE OF PINOUT
+<!-- INSERT PICTURE OF PINOUT -->
 
 Next, install the pi into the main body. It should click onto the 4 pegs
 
-INSERT PICTURE OF PI INSTALLED
+<!-- INSERT PICTURE OF PI INSTALLED -->
 
 Place the OLED screen inside of the sandwich plate and connect the wires on the back
 
-INSERT PICTURE OF SCREEN ASSEMBLY
+<!-- INSERT PICTURE OF SCREEN ASSEMBLY -->
 
 Place the 4x buttons in the supplied slots and connect the wires on the back
 
-INSERT PICTURE OF BUTTONS
+<!-- INSERT PICTURE OF BUTTONS -->
 
 Insert the faceplate on top and fasten with 4x screws
 
-INSERT PICTURE OF ASSEMBLED
+<!-- INSERT PICTURE OF ASSEMBLED -->
 
 Connect to the Pi at the back of the case with a 5V power wire (USB charger in the cigarette lighter is easiest) and connect the consult cable to the USB port using an OTG cable.
 
-INSERT PICTURE OF WIRES
+<!-- INSERT PICTURE OF WIRES -->
 
 Connect the other end of the Consult cable underneath the dashboard
 
-INSERT PICTURE OF PORT
+<!-- INSERT PICTURE OF PORT -->
 
 Turn on the car and you should be ready to go! Make sure to configure settings as necessary
 
-INSERT PICTURE OF RUNNING ASSEMBLY MOUNTED TO CAR
+<!-- INSERT PICTURE OF RUNNING ASSEMBLY MOUNTED TO CAR -->
 
 ## Usage
 
 1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
 2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable power with `sudo chmod +x ConsultStart.sh`
 3. The script will start recording data over serial and display it on the SPI display.
-4. You can set up SSH to connect to the device once it is on your network. The default address is kylec@consult.local 
+4. You can set up SSH to connect to the device once it is on your network
 
 ## Configuration
 

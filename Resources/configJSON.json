@@ -22,5 +22,7 @@
 
     "RPM_Warning": 7000,
 
-    "PWM_Index": 999
+    "PWM_Index": 999,
+
+    "Log_Index": 0
 }

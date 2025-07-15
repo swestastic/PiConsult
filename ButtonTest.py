@@ -4,14 +4,14 @@
 
 import sys,os,time,serial,threading,datetime,json #type: ignore
 from Resources import config
-from Main_Bare_Imports.Settings import Load_Config, Save_Config
+from Utils.Settings import Load_Config, Save_Config
 import Resources.OLED_2in42 as OLED_2in42
 from PIL import Image,ImageDraw,ImageFont
 from gpiozero import Button # type: ignore
 import numpy as np
 from Resources import dtc_dict as DTC_DICT
-from Main_Bare_Imports.Read import ReadStream
-from Main_Bare_Imports.Flash import FlashText, Center_Text
+from Utils.Read import ReadStream
+from Utils.Flash import FlashText, Center_Text
 import socket
 
 # OLED screen info
