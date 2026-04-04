@@ -36,6 +36,8 @@ def process_buttons(
     settings_mode: int,
     active_test_mode: int,
     digital_bits_mode: int,
+    mode_menu_mode: int,
+    mode_menu_targets: list[int],
     mode_count: int,
     show_peak_fn: Callable[[int], None],
     adjust_setting_value_fn: Callable[[int, int], None],
@@ -58,14 +60,15 @@ def process_buttons(
 
         if event == "mode":
             with state.acquire_lock():
-                state.current_mode = (state.current_mode + 1) % mode_count
+                current_mode = state.current_mode
+                if current_mode in mode_menu_targets:
+                    state.mode_menu_index = mode_menu_targets.index(current_mode)
+                state.current_mode = mode_menu_mode
                 state.dtc_clear_confirm_active = False
                 state.active_test_editing = False
+                state.active_test_in_test = False
+                state.setting_in_item = False
                 state.setting_editing = False
-                current_mode = state.current_mode
-
-            if current_mode == dtc_mode:
-                update_dtc_codes_from_ecu_fn(state, port_obj, demo_mode, read_dtc_codes_fn)
 
         elif event == "up":
             with state.acquire_lock():
@@ -93,7 +96,10 @@ def process_buttons(
                         state.setting_editing = False
             elif current_mode == active_test_mode:
                 with state.acquire_lock():
-                    if state.active_test_editing:
+                    if not state.active_test_in_test:
+                        state.active_test_index = (state.active_test_index - 1) % len(active_test_items)
+                        should_adjust = False
+                    elif state.active_test_editing:
                         active_idx = state.active_test_index
                         if active_idx == 4:
                             state.active_test_power_balance_cursor = (state.active_test_power_balance_cursor - 1) % 9
@@ -101,7 +107,6 @@ def process_buttons(
                         else:
                             should_adjust = True
                     else:
-                        state.active_test_index = (state.active_test_index - 1) % len(active_test_items)
                         should_adjust = False
 
                 if should_adjust:
@@ -109,6 +114,9 @@ def process_buttons(
             elif current_mode == digital_bits_mode:
                 with state.acquire_lock():
                     state.digital_page_index = (state.digital_page_index - 1) % len(digital_register_order)
+            elif current_mode == mode_menu_mode:
+                with state.acquire_lock():
+                    state.mode_menu_index = (state.mode_menu_index - 1) % len(mode_menu_targets)
 
         elif event == "down":
             with state.acquire_lock():
@@ -136,7 +144,10 @@ def process_buttons(
                         state.setting_editing = False
             elif current_mode == active_test_mode:
                 with state.acquire_lock():
-                    if state.active_test_editing:
+                    if not state.active_test_in_test:
+                        state.active_test_index = (state.active_test_index + 1) % len(active_test_items)
+                        should_adjust = False
+                    elif state.active_test_editing:
                         active_idx = state.active_test_index
                         if active_idx == 4:
                             state.active_test_power_balance_cursor = (state.active_test_power_balance_cursor + 1) % 9
@@ -144,7 +155,6 @@ def process_buttons(
                         else:
                             should_adjust = True
                     else:
-                        state.active_test_index = (state.active_test_index + 1) % len(active_test_items)
                         should_adjust = False
 
                 if should_adjust:
@@ -152,6 +162,9 @@ def process_buttons(
             elif current_mode == digital_bits_mode:
                 with state.acquire_lock():
                     state.digital_page_index = (state.digital_page_index + 1) % len(digital_register_order)
+            elif current_mode == mode_menu_mode:
+                with state.acquire_lock():
+                    state.mode_menu_index = (state.mode_menu_index + 1) % len(mode_menu_targets)
 
         elif event == "select":
             with state.acquire_lock():
@@ -184,6 +197,9 @@ def process_buttons(
                             state.dtc_status_message = "Cleared" if clear_ok else "Clear Failed"
                             state.dtc_status_until = time.monotonic() + 1.5
             elif current_mode == settings_mode:
+                with state.acquire_lock():
+                    setting_editing = state.setting_editing
+
                 if setting_index in settings_adjustable_indexes:
                     with state.acquire_lock():
                         state.setting_editing = not state.setting_editing
@@ -194,7 +210,28 @@ def process_buttons(
                 elif setting_text[setting_index] == "Default Display":
                     on_default_display_cycle_fn()
             elif current_mode == active_test_mode:
-                run_active_test_action_fn(port_obj, demo_mode, state, send_activation_command_fn)
+                with state.acquire_lock():
+                    in_test = state.active_test_in_test
+
+                if not in_test:
+                    with state.acquire_lock():
+                        state.active_test_in_test = True
+                        state.active_test_editing = False
+                else:
+                    run_active_test_action_fn(port_obj, demo_mode, state, send_activation_command_fn)
             elif current_mode == digital_bits_mode:
                 with state.acquire_lock():
                     state.digital_page_index = (state.digital_page_index + 1) % len(digital_register_order)
+            elif current_mode == mode_menu_mode:
+                with state.acquire_lock():
+                    selected_mode = mode_menu_targets[state.mode_menu_index]
+                    state.current_mode = selected_mode
+                    if selected_mode == active_test_mode:
+                        state.active_test_in_test = False
+                        state.active_test_editing = False
+                    if selected_mode == settings_mode:
+                        state.setting_in_item = False
+                        state.setting_editing = False
+
+                if selected_mode == dtc_mode:
+                    update_dtc_codes_from_ecu_fn(state, port_obj, demo_mode, read_dtc_codes_fn)

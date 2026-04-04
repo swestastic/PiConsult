@@ -2,6 +2,7 @@ from functools import partial
 from typing import Any, Callable, Optional
 
 import serial
+from PIL import Image, ImageDraw, ImageFont
 
 
 def update_units(
@@ -44,9 +45,55 @@ def build_show_setting_screen_fn(
     state: Any,
     setting_text: list[str],
     settings_adjustable_indexes: set[int],
+    gauge: Any,
     show_gauge_fn: Callable[..., None],
 ) -> Callable[[], None]:
-    return partial(show_setting_screen, state, setting_text, settings_adjustable_indexes, show_gauge_fn)
+    return partial(show_setting_screen, state, setting_text, settings_adjustable_indexes, gauge, show_gauge_fn)
+
+
+def show_settings_list_screen(
+    gauge: Any,
+    setting_text: list[str],
+    setting_values: list[Any],
+    selected_index: int,
+    setting_editing: bool,
+    settings_adjustable_indexes: set[int],
+) -> None:
+    width = gauge.disp.height
+    height = gauge.disp.width
+    image = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    title = "Settings"
+    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
+    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+
+    body_font = ImageFont.load_default()
+    start_y = 36
+    bottom_margin = 18
+    row_height = max(13, (height - start_y - bottom_margin) // len(setting_text))
+
+    for row_index, label in enumerate(setting_text):
+        y = start_y + (row_index * row_height)
+        is_selected = row_index == selected_index
+
+        if is_selected:
+            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+
+        pointer = ">" if is_selected else " "
+        value_text = str(setting_values[row_index]) if row_index < len(setting_values) else ""
+        edit_tag = " [EDIT]" if (is_selected and setting_editing and row_index in settings_adjustable_indexes) else ""
+        line = f"{pointer} {label}: {value_text}{edit_tag}"
+        text_color = (240, 240, 240) if is_selected else (165, 165, 165)
+        draw.text((8, y + 2), line, font=body_font, fill=text_color)
+
+    footer = "Up/Down: Adjust  Select: Save" if setting_editing else "Up/Down: Navigate  Select: Edit"
+    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+
+    if gauge.rotation_degrees:
+        image = image.rotate(gauge.rotation_degrees)
+
+    gauge.disp.ShowImage(image)
 
 
 def build_apply_settings_to_runtime_fn(
@@ -141,26 +188,21 @@ def show_setting_screen(
     state: Any,
     setting_text: list[str],
     settings_adjustable_indexes: set[int],
+    gauge: Any,
     show_gauge_fn: Callable[..., None],
 ) -> None:
     with state.acquire_lock():
-        setting_name = setting_text[state.setting_index]
-        setting_value = str(state.setting_values[state.setting_index])
         setting_index = state.setting_index
         setting_editing = state.setting_editing
+        setting_values = state.setting_values.copy()
 
-    title = setting_name
-    if setting_index in settings_adjustable_indexes:
-        title = f"{setting_name} [EDIT]" if setting_editing else f"{setting_name} [NAV]"
-
-    show_gauge_fn(
-        title,
-        float(setting_index + 1),
-        setting_value,
-        1.0,
-        float(len(setting_text)),
-        show_needle=False,
-        show_dial=False,
+    show_settings_list_screen(
+        gauge,
+        setting_text,
+        setting_values,
+        setting_index,
+        setting_editing,
+        settings_adjustable_indexes,
     )
 
 

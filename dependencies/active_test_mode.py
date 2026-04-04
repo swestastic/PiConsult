@@ -213,6 +213,42 @@ def show_power_balance_menu_screen(gauge: Any, editing: bool, cursor_selection: 
     gauge.disp.ShowImage(image)
 
 
+def show_active_test_list_screen(gauge: Any, selected_index: int) -> None:
+    width = gauge.disp.height
+    height = gauge.disp.width
+    image = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    title = "Active Tests"
+    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
+    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+
+    body_font = ImageFont.load_default()
+    start_y = 36
+    bottom_margin = 18
+    row_height = max(13, (height - start_y - bottom_margin) // len(ACTIVE_TEST_ITEMS))
+
+    for row_index, label in enumerate(ACTIVE_TEST_ITEMS):
+        y = start_y + (row_index * row_height)
+        is_selected = row_index == selected_index
+
+        if is_selected:
+            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+
+        pointer = ">" if is_selected else " "
+        line = f"{pointer} {label}"
+        text_color = (240, 240, 240) if is_selected else (165, 165, 165)
+        draw.text((8, y + 2), line, font=body_font, fill=text_color)
+
+    footer = "Up/Down: Navigate  Select: Open"
+    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+
+    if gauge.rotation_degrees:
+        image = image.rotate(gauge.rotation_degrees)
+
+    gauge.disp.ShowImage(image)
+
+
 def show_active_test_screen(
     state: Any,
     gauge: Any,
@@ -221,6 +257,7 @@ def show_active_test_screen(
 ) -> None:
     with state.acquire_lock():
         idx = state.active_test_index
+        in_test = state.active_test_in_test
         editing = state.active_test_editing
         status_message = state.active_test_status_message
         status_until = state.active_test_status_until
@@ -232,6 +269,10 @@ def show_active_test_screen(
         power_balance = state.active_test_power_balance_cylinder_off
         fuel_pump_off = state.active_test_fuel_pump_off
         units_temp = state.units_temp
+
+    if not in_test:
+        show_active_test_list_screen(gauge, idx)
+        return
 
     if status_message and time.monotonic() < status_until:
         show_gauge(

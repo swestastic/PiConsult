@@ -9,6 +9,7 @@ import socket
 import subprocess
 import numpy as np
 from typing import Optional, Any
+from PIL import Image, ImageDraw, ImageFont
 
 from dependencies import config
 from dependencies.Buttons import process_buttons as process_button_events, setup_button_callbacks
@@ -293,7 +294,23 @@ DTC_MODE = 1
 SETTINGS_MODE = 2
 ACTIVE_TEST_MODE = 3
 DIGITAL_BITS_MODE = 4
-MODE_COUNT = 5
+MODE_MENU = 5
+MODE_COUNT = 6
+
+MODE_MENU_ITEMS = [
+    "Data Stream",
+    "DTC",
+    "Active Test",
+    "Digital Registers",
+    "Settings",
+]
+MODE_MENU_TARGETS = [
+    DISPLAY_MODE,
+    DTC_MODE,
+    ACTIVE_TEST_MODE,
+    DIGITAL_BITS_MODE,
+    SETTINGS_MODE,
+]
 
 # Display and settings metadata (read-only)
 DisplayText = ["RPM", "SPEED", "MAF", "AAC", "TEMP", "BATT", "INJ", "TIM", "TPS"]
@@ -368,10 +385,15 @@ class AppState:
             f"{int(round(rpm_warning))} RPM",
             f"{int(round(coolant_warning))} {temp_unit_label(units_temp)}",
         ]
+        self.setting_in_item = False
         self.setting_editing = False
+
+        # Mode menu state
+        self.mode_menu_index = 0
 
         # Active test mode state
         self.active_test_index = 0
+        self.active_test_in_test = False
         self.active_test_editing = False
         self.active_test_status_message = ""
         self.active_test_status_until = 0.0
@@ -480,6 +502,7 @@ show_setting_screen = build_show_setting_screen_fn(
     state,
     SettingText,
     SETTINGS_ADJUSTABLE_INDEXES,
+    gauge,
     show_gauge,
 )
 apply_settings_to_runtime = build_apply_settings_to_runtime_fn(
@@ -545,6 +568,45 @@ def Show_Peak(idx: int) -> None:
     
     with state.acquire_lock():
         state.showing_peak = False
+
+
+def show_mode_menu_screen() -> None:
+    with state.acquire_lock():
+        mode_menu_index = state.mode_menu_index
+
+    width = gauge.disp.height
+    height = gauge.disp.width
+    image = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    title = "Select Mode"
+    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
+    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+
+    body_font = ImageFont.load_default()
+    start_y = 36
+    bottom_margin = 18
+    row_height = max(13, (height - start_y - bottom_margin) // len(MODE_MENU_ITEMS))
+
+    for idx, label in enumerate(MODE_MENU_ITEMS):
+        y = start_y + (idx * row_height)
+        is_selected = idx == mode_menu_index
+
+        if is_selected:
+            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+
+        pointer = ">" if is_selected else " "
+        line = f"{pointer} {label}"
+        text_color = (240, 240, 240) if is_selected else (165, 165, 165)
+        draw.text((8, y + 2), line, font=body_font, fill=text_color)
+
+    footer = "Up/Down: Navigate  Select: Open"
+    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+
+    if gauge.rotation_degrees:
+        image = image.rotate(gauge.rotation_degrees)
+
+    gauge.disp.ShowImage(image)
 
 
 def send_activation_command(
@@ -681,6 +743,8 @@ try:
             SETTINGS_MODE,
             ACTIVE_TEST_MODE,
             DIGITAL_BITS_MODE,
+            MODE_MENU,
+            MODE_MENU_TARGETS,
             MODE_COUNT,
             Show_Peak,
             adjust_setting_value,
@@ -805,6 +869,9 @@ try:
 
         elif current_mode == DIGITAL_BITS_MODE:
             show_digital_bits_screen(state, gauge)
+
+        elif current_mode == MODE_MENU:
+            show_mode_menu_screen()
 
         if not pump_local_ui_events():
             read_thread_active = False
