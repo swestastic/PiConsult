@@ -176,10 +176,9 @@ def update_setting_values(
         state.setting_values[0] = units[1]
         state.setting_values[1] = units[4]
         state.setting_values[2] = f"{state.speed_correction:.2f}"
-        state.setting_values[3] = parse_float_fn(settings.get("Injector_Size", 0), 0)
-        state.setting_values[4] = display_text[state.default_display]
-        state.setting_values[5] = f"{int(round(state.rpm_warning))} RPM"
-        state.setting_values[6] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
+        state.setting_values[3] = display_text[state.default_display]
+        state.setting_values[4] = f"{int(round(state.rpm_warning))} RPM"
+        state.setting_values[5] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
 
 
 def apply_settings_to_runtime(
@@ -225,7 +224,7 @@ def adjust_setting_value(
             state.speed_correction = new_value
         settings["Speed_Correction"] = new_value
 
-    elif setting_index == 5:
+    elif setting_index == 4:
         with state.acquire_lock():
             current = state.rpm_warning
         new_value = float(max(1000, min(10000, int(round(current)) + (direction * 100))))
@@ -233,7 +232,7 @@ def adjust_setting_value(
             state.rpm_warning = new_value
         settings["RPM_Warning"] = int(round(new_value))
 
-    elif setting_index == 6:
+    elif setting_index == 5:
         with state.acquire_lock():
             current = state.coolant_warning
             units_temp = state.units_temp
@@ -244,11 +243,6 @@ def adjust_setting_value(
         with state.acquire_lock():
             state.coolant_warning = new_value
         settings["Coolant_Warning"] = int(round(new_value))
-
-    elif setting_index == 3:
-        current = parse_float_fn(settings.get("Injector_Size", 0), 0)
-        new_value = float(max(0, min(3000, int(round(current)) + (direction * 10))))
-        settings["Injector_Size"] = int(round(new_value))
 
     else:
         return
@@ -319,6 +313,6 @@ def cycle_default_display(
     with state.acquire_lock():
         state.default_display = (state.default_display + 1) % len(display_text)
         default_display = state.default_display
-        state.setting_values[4] = display_text[default_display]
+        state.setting_values[3] = display_text[default_display]
     settings["Default_Display"] = default_display
     save_config_fn(config_file, settings)

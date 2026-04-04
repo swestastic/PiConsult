@@ -16,17 +16,11 @@ def Load_Config(FILE):
 
             "Default_Display": 0,
 
-            "Injector_Size": 0,
-
             "Coolant_Warning": 200,
 
             "RPM_Warning": 7000,
 
-            "PWM_Index": 999,
-
-            "Log_Index": 0,
-
-            "WebApp_Enabled": False
+            "Log_Index": 0
         }
 
 # Save settings to the config file

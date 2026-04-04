@@ -38,13 +38,14 @@ def show_dtc_screen(state: Any, show_gauge: Callable[..., None], dtc_titles: dic
     dtc_code = int(dtc_codes[dtc_index]) if dtc_index < len(dtc_codes) else -1
     dtc_title = dtc_titles.get(dtc_code, "Unknown DTC")
     show_gauge(
-        f"DTC {dtc_index + 1}/{len(dtc_codes)}",
-        float(dtc_code),
+        f"DTC {dtc_code} ({dtc_index + 1}/{len(dtc_codes)})",
+        0.0,
         dtc_title,
         1.0,
         55.0,
         show_needle=False,
         show_dial=False,
+        show_value_text=False,
     )
 
 

@@ -355,6 +355,8 @@ class GaugeNeedleDisplay:
             unit_str = unit if unit else ""
             unit_width, unit_height = self._text_size(draw, unit_str, self.unit_font) if unit_str else (0, 0)
 
+        no_dial_content_top = 0
+
         if show_dial:
             reserved_value_width, reserved_value_height = self._get_reserved_value_size(draw)
             value_y = self._center_y + 56
@@ -381,6 +383,7 @@ class GaugeNeedleDisplay:
                 line_x = (width - line_w) // 2
                 draw.text((line_x, y_cursor), line, font=self.title_font, fill=(255, 255, 255))
                 y_cursor += line_h + line_gap
+            no_dial_content_top = y_cursor + 4
 
             if show_value_text:
                 combined_width = value_width + (8 + unit_width if unit_str else 0)
@@ -399,12 +402,34 @@ class GaugeNeedleDisplay:
             draw.text((value_x, value_y), value_str, font=self.value_font, fill=(255, 220, 120))
 
         if unit_str:
-            if show_value_text:
+            if not show_dial and not show_value_text:
+                wrapped_unit_lines = self._wrap_text_lines(
+                    draw,
+                    unit_str,
+                    self.unit_font,
+                    max(20, width - 12),
+                    max_lines=6,
+                )
+                unit_line_gap = 2
+                unit_line_sizes = [self._text_size(draw, line, self.unit_font) for line in wrapped_unit_lines]
+                unit_block_height = sum(h for _, h in unit_line_sizes) + (unit_line_gap * (len(unit_line_sizes) - 1))
+                unit_y = max(no_dial_content_top, value_y)
+                if unit_y + unit_block_height > height - 2:
+                    unit_y = max(no_dial_content_top, height - unit_block_height - 2)
+
+                y_cursor = unit_y
+                for line, (line_w, line_h) in zip(wrapped_unit_lines, unit_line_sizes):
+                    line_x = (width - line_w) // 2
+                    draw.text((line_x, y_cursor), line, font=self.unit_font, fill=(200, 200, 200))
+                    y_cursor += line_h + unit_line_gap
+            elif show_value_text:
                 unit_x = unit_x_anchor
+                unit_y = unit_y_anchor
+                draw.text((unit_x, unit_y), unit_str, font=self.unit_font, fill=(200, 200, 200))
             else:
-                unit_x = value_x
-            unit_y = unit_y_anchor
-            draw.text((unit_x, unit_y), unit_str, font=self.unit_font, fill=(200, 200, 200))
+                unit_x = title_center_x - (unit_width // 2)
+                unit_y = unit_y_anchor
+                draw.text((unit_x, unit_y), unit_str, font=self.unit_font, fill=(200, 200, 200))
 
         active_warning_lines: list[str] = []
         if warning_lines:

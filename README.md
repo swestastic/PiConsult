@@ -8,6 +8,8 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ### Mode 1: Data stream
 
+![gauge image](images/gauge.gif)
+
 Reads the following data from the ECU and can display live data on the screen. Displayed value changes with button press of Up/Down. Press Select to see the peak value stored during this drive.
 
 - Engine RPM
@@ -22,9 +24,13 @@ Reads the following data from the ECU and can display live data on the screen. D
 
 ### Mode 2: DTCs
 
+![dtc image](images/dtc.gif)
+
 Reading of Data Trouble Codes (DTCs) and ability to clear stored DTCs. Cycle through stored DTCs with Up/Down. Press Select to clear stored ones.
 
 ### Mode 3: Settings
+
+![settings image](images/settings.gif)
 
 Settings adjustment mode with the following options:
 
@@ -48,6 +54,8 @@ Active Testing mode with the following functions:
 - Clear self learn trims
 
 ### Mode 5: Digital Bit Register
+
+![digital bit image](images/digitalbit.gif)
 
 View binary values in the ECU that tell you when solenoids or other switches are triggered
 

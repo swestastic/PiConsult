@@ -180,7 +180,7 @@ def show_power_balance_menu_screen(gauge: Any, editing: bool, cursor_selection: 
     image = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    title = "Power Balance [EDIT]" if editing else "Power Balance [SEL]"
+    title = "Power Balance [EDIT]" if editing else "Power Balance [NAV]"
     title_width, _ = gauge._text_size(draw, title, gauge.label_font)
     draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
 
@@ -250,7 +250,7 @@ def show_active_test_screen(
         show_power_balance_menu_screen(gauge, editing, power_balance_cursor, power_balance)
         return
 
-    mode_suffix = "[EDIT]" if editing else "[SEL]"
+    mode_suffix = "[EDIT]" if editing else "[NAV]"
     title = f"AT {idx + 1}/{len(ACTIVE_TEST_ITEMS)} {mode_suffix}"
     item_name = ACTIVE_TEST_ITEMS[idx]
 

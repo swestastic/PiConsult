@@ -177,7 +177,7 @@ def process_buttons(
                         state.dtc_clear_confirm_active = False
 
                     if confirm_yes:
-                        clear_ok = clear_dtc_codes_fn(port_obj, demo_mode)
+                        clear_ok = clear_dtc_codes_fn(port_obj, demo_mode=demo_mode)
                         if clear_ok:
                             update_dtc_codes_from_ecu_fn(state, port_obj, demo_mode, read_dtc_codes_fn)
                         with state.acquire_lock():
@@ -191,7 +191,7 @@ def process_buttons(
                     on_speed_units_toggle_fn()
                 elif setting_index == 1:
                     on_temp_units_toggle_fn()
-                elif setting_index == 4:
+                elif setting_text[setting_index] == "Default Display":
                     on_default_display_cycle_fn()
             elif current_mode == active_test_mode:
                 run_active_test_action_fn(port_obj, demo_mode, state, send_activation_command_fn)

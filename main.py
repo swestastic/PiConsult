@@ -264,7 +264,6 @@ Default_Display = int(Settings["Default_Display"])
 RPM_Warning = parse_float(Settings["RPM_Warning"], 6500.0)
 Coolant_Warning = parse_float(Settings["Coolant_Warning"], 220.0)
 Speed_Correction = parse_float(Settings.get("Speed_Correction", 1.0), 1.0)
-Injector_Size = parse_float(Settings.get("Injector_Size", 0), 0)
 
 # Gauge display init
 GAUGE_ROTATION = int(os.getenv("CONSULT_GAUGE_ROTATION", "0"))
@@ -313,7 +312,6 @@ SettingText = [
     "Speed Units",
     "Temp Units",
     "Speed Correction",
-    "Injector Size",
     "Default Display",
     "RPM Warning",
     "Coolant Warning",
@@ -322,13 +320,11 @@ SettingText = [
 SETTING_SPEED_UNITS = 0
 SETTING_TEMP_UNITS = 1
 SETTING_SPEED_CORRECTION = 2
-SETTING_INJECTOR_SIZE = 3
-SETTING_DEFAULT_DISPLAY = 4
-SETTING_RPM_WARNING = 5
-SETTING_COOLANT_WARNING = 6
+SETTING_DEFAULT_DISPLAY = 3
+SETTING_RPM_WARNING = 4
+SETTING_COOLANT_WARNING = 5
 SETTINGS_ADJUSTABLE_INDEXES = {
     SETTING_SPEED_CORRECTION,
-    SETTING_INJECTOR_SIZE,
     SETTING_RPM_WARNING,
     SETTING_COOLANT_WARNING,
 }
@@ -368,7 +364,6 @@ class AppState:
             speed_unit_label(units_speed),
             temp_unit_label(units_temp),
             f"{Speed_Correction:.2f}",
-            Injector_Size,
             DisplayText[default_display],
             f"{int(round(rpm_warning))} RPM",
             f"{int(round(coolant_warning))} {temp_unit_label(units_temp)}",

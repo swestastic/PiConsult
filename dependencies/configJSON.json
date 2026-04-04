@@ -1,1 +1,1 @@
-{"Units_Speed": "MPH", "Units_Temp": "F", "Speed_Correction": 1.1, "Default_Display": 0, "Injector_Size": 270, "Coolant_Warning": 165, "RPM_Warning": 6800, "Log_Index": 64}
+{"Units_Speed": "MPH", "Units_Temp": "F", "Speed_Correction": 1.0, "Default_Display": 0, "Injector_Size": 270, "Coolant_Warning": 170, "RPM_Warning": 6800, "Log_Index": 75}
