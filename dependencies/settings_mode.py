@@ -4,6 +4,18 @@ from typing import Any, Callable, Optional
 import serial
 from PIL import Image, ImageDraw, ImageFont
 
+APP_VERSION = "V1.0.0"
+INFO_LINES = [
+    "PiConsult by Swestastic",
+    f"Software Version: {APP_VERSION}",
+    "",
+    "This is free software.",
+    "You are free to use, modify, and share it.",
+    "See the project README for details.",
+    "",
+    "github.com/swestastic/PiConsult",
+]
+
 
 def update_units(
     state: Any,
@@ -96,6 +108,39 @@ def show_settings_list_screen(
     gauge.disp.ShowImage(image)
 
 
+def show_info_screen(gauge: Any) -> None:
+    width = gauge.disp.height
+    height = gauge.disp.width
+    image = Image.new("RGB", (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    title = "Info"
+    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
+    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+
+    body_font = ImageFont.load_default()
+    line_gap = 4
+    line_sizes = [gauge._text_size(draw, line, body_font) for line in INFO_LINES]
+    total_height = sum(height for _, height in line_sizes) + (line_gap * (len(INFO_LINES) - 1))
+    y_cursor = max(32, (height - total_height) // 2)
+
+    for line, (line_width, line_height) in zip(INFO_LINES, line_sizes):
+        if not line:
+            y_cursor += line_height + line_gap
+            continue
+        draw.text(((width - line_width) // 2, y_cursor), line, font=body_font, fill=(220, 220, 220))
+        y_cursor += line_height + line_gap
+
+    footer = "Select to return"
+    footer_width, _ = gauge._text_size(draw, footer, body_font)
+    draw.text(((width - footer_width) // 2, height - 14), footer, font=body_font, fill=(180, 180, 180))
+
+    if gauge.rotation_degrees:
+        image = image.rotate(gauge.rotation_degrees)
+
+    gauge.disp.ShowImage(image)
+
+
 def build_apply_settings_to_runtime_fn(
     state: Any,
     settings: dict[str, object],
@@ -174,6 +219,16 @@ def build_toggle_temp_units_fn(
     )
 
 
+def build_toggle_gauge_display_mode_fn(
+    state: Any,
+    settings: dict[str, object],
+    save_config_fn: Callable[[str, dict[str, object]], None],
+    config_file: str,
+    update_settings_values_fn: Callable[[], None],
+) -> Callable[[], None]:
+    return partial(toggle_gauge_display_mode, state, settings, save_config_fn, config_file, update_settings_values_fn)
+
+
 def build_cycle_default_display_fn(
     state: Any,
     settings: dict[str, object],
@@ -194,7 +249,12 @@ def show_setting_screen(
     with state.acquire_lock():
         setting_index = state.setting_index
         setting_editing = state.setting_editing
+        setting_info_view = state.setting_info_view
         setting_values = state.setting_values.copy()
+
+    if setting_info_view:
+        show_info_screen(gauge)
+        return
 
     show_settings_list_screen(
         gauge,
@@ -218,9 +278,12 @@ def update_setting_values(
         state.setting_values[0] = units[1]
         state.setting_values[1] = units[4]
         state.setting_values[2] = f"{state.speed_correction:.2f}"
-        state.setting_values[3] = display_text[state.default_display]
-        state.setting_values[4] = f"{int(round(state.rpm_warning))} RPM"
-        state.setting_values[5] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
+        state.setting_values[3] = normalize_gauge_display_mode(state.gauge_display_mode)
+        state.setting_values[4] = display_text[state.default_display]
+        state.setting_values[5] = f"{int(round(state.rpm_warning))} RPM"
+        state.setting_values[6] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
+        if len(state.setting_values) > 7:
+            state.setting_values[7] = "About"
 
 
 def apply_settings_to_runtime(
@@ -236,6 +299,7 @@ def apply_settings_to_runtime(
     state.units_speed = settings.get("Units_Speed", state.units_speed)
     state.units_temp = settings.get("Units_Temp", state.units_temp)
     state.speed_correction = parse_float_fn(settings.get("Speed_Correction", state.speed_correction), state.speed_correction)
+    state.gauge_display_mode = normalize_gauge_display_mode(settings.get("Gauge_Display_Mode", state.gauge_display_mode))
 
     with state.acquire_lock():
         state.default_display = parse_int_fn(settings.get("Default_Display", state.default_display), state.default_display) % len(display_text)
@@ -266,7 +330,7 @@ def adjust_setting_value(
             state.speed_correction = new_value
         settings["Speed_Correction"] = new_value
 
-    elif setting_index == 4:
+    elif setting_index == 5:
         with state.acquire_lock():
             current = state.rpm_warning
         new_value = float(max(1000, min(10000, int(round(current)) + (direction * 100))))
@@ -274,7 +338,7 @@ def adjust_setting_value(
             state.rpm_warning = new_value
         settings["RPM_Warning"] = int(round(new_value))
 
-    elif setting_index == 5:
+    elif setting_index == 6:
         with state.acquire_lock():
             current = state.coolant_warning
             units_temp = state.units_temp
@@ -355,6 +419,31 @@ def cycle_default_display(
     with state.acquire_lock():
         state.default_display = (state.default_display + 1) % len(display_text)
         default_display = state.default_display
-        state.setting_values[3] = display_text[default_display]
+        state.setting_values[4] = display_text[default_display]
     settings["Default_Display"] = default_display
     save_config_fn(config_file, settings)
+
+
+def normalize_gauge_display_mode(value: object) -> str:
+    raw = str(value).strip().lower()
+    if raw in {"value", "value only", "value-only", "value_only"}:
+        return "Value Only"
+    return "Gauge + Value"
+
+
+def toggle_gauge_display_mode(
+    state: Any,
+    settings: dict[str, object],
+    save_config_fn: Callable[[str, dict[str, object]], None],
+    config_file: str,
+    update_settings_values_fn: Callable[[], None],
+) -> None:
+    with state.acquire_lock():
+        current = normalize_gauge_display_mode(state.gauge_display_mode)
+
+    new_mode = "Value Only" if current == "Gauge + Value" else "Gauge + Value"
+    with state.acquire_lock():
+        state.gauge_display_mode = new_mode
+    settings["Gauge_Display_Mode"] = new_mode
+    save_config_fn(config_file, settings)
+    update_settings_values_fn()

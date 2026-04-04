@@ -13,6 +13,7 @@ def Load_Config(FILE):
             "Units_Speed": "MPH",
             "Units_Temp": "F",
             "Speed_Correction": 1.0,
+            "Gauge_Display_Mode": "Gauge + Value",
 
             "Default_Display": 0,
 

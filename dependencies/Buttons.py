@@ -51,6 +51,7 @@ def process_buttons(
     on_speed_units_toggle_fn: Callable[[], None],
     on_temp_units_toggle_fn: Callable[[], None],
     on_default_display_cycle_fn: Callable[[], None],
+    on_gauge_display_mode_toggle_fn: Callable[[], None],
 ) -> None:
     """Process queued button presses and update app state."""
     import time
@@ -68,6 +69,7 @@ def process_buttons(
                 state.active_test_editing = False
                 state.active_test_in_test = False
                 state.setting_in_item = False
+                state.setting_info_view = False
                 state.setting_editing = False
 
         elif event == "up":
@@ -87,8 +89,11 @@ def process_buttons(
                 with state.acquire_lock():
                     setting_index = state.setting_index
                     setting_editing = state.setting_editing
+                    setting_info_view = state.setting_info_view
 
-                if setting_editing and setting_index in settings_adjustable_indexes:
+                if setting_info_view:
+                    pass
+                elif setting_editing and setting_index in settings_adjustable_indexes:
                     adjust_setting_value_fn(setting_index, -1)
                 else:
                     with state.acquire_lock():
@@ -96,9 +101,16 @@ def process_buttons(
                         state.setting_editing = False
             elif current_mode == active_test_mode:
                 with state.acquire_lock():
-                    if not state.active_test_in_test:
-                        state.active_test_index = (state.active_test_index - 1) % len(active_test_items)
-                        should_adjust = False
+                    if state.active_test_in_test:
+                        active_idx = state.active_test_index
+                        if state.active_test_editing and active_idx == 4:
+                            state.active_test_power_balance_cursor = (state.active_test_power_balance_cursor - 1) % 9
+                            should_adjust = False
+                        elif state.active_test_editing:
+                            should_adjust = True
+                        else:
+                            state.active_test_index = (state.active_test_index - 1) % len(active_test_items)
+                            should_adjust = False
                     elif state.active_test_editing:
                         active_idx = state.active_test_index
                         if active_idx == 4:
@@ -107,6 +119,7 @@ def process_buttons(
                         else:
                             should_adjust = True
                     else:
+                        state.active_test_index = (state.active_test_index - 1) % len(active_test_items)
                         should_adjust = False
 
                 if should_adjust:
@@ -135,8 +148,11 @@ def process_buttons(
                 with state.acquire_lock():
                     setting_index = state.setting_index
                     setting_editing = state.setting_editing
+                    setting_info_view = state.setting_info_view
 
-                if setting_editing and setting_index in settings_adjustable_indexes:
+                if setting_info_view:
+                    pass
+                elif setting_editing and setting_index in settings_adjustable_indexes:
                     adjust_setting_value_fn(setting_index, 1)
                 else:
                     with state.acquire_lock():
@@ -144,9 +160,16 @@ def process_buttons(
                         state.setting_editing = False
             elif current_mode == active_test_mode:
                 with state.acquire_lock():
-                    if not state.active_test_in_test:
-                        state.active_test_index = (state.active_test_index + 1) % len(active_test_items)
-                        should_adjust = False
+                    if state.active_test_in_test:
+                        active_idx = state.active_test_index
+                        if state.active_test_editing and active_idx == 4:
+                            state.active_test_power_balance_cursor = (state.active_test_power_balance_cursor + 1) % 9
+                            should_adjust = False
+                        elif state.active_test_editing:
+                            should_adjust = True
+                        else:
+                            state.active_test_index = (state.active_test_index + 1) % len(active_test_items)
+                            should_adjust = False
                     elif state.active_test_editing:
                         active_idx = state.active_test_index
                         if active_idx == 4:
@@ -155,6 +178,7 @@ def process_buttons(
                         else:
                             should_adjust = True
                     else:
+                        state.active_test_index = (state.active_test_index + 1) % len(active_test_items)
                         should_adjust = False
 
                 if should_adjust:
@@ -199,24 +223,43 @@ def process_buttons(
             elif current_mode == settings_mode:
                 with state.acquire_lock():
                     setting_editing = state.setting_editing
+                    setting_info_view = state.setting_info_view
 
-                if setting_index in settings_adjustable_indexes:
+                if setting_info_view:
+                    with state.acquire_lock():
+                        state.setting_info_view = False
+                elif setting_index in settings_adjustable_indexes:
                     with state.acquire_lock():
                         state.setting_editing = not state.setting_editing
                 elif setting_index == 0:
                     on_speed_units_toggle_fn()
                 elif setting_index == 1:
                     on_temp_units_toggle_fn()
+                elif setting_text[setting_index] == "Gauge Display Mode":
+                    on_gauge_display_mode_toggle_fn()
                 elif setting_text[setting_index] == "Default Display":
                     on_default_display_cycle_fn()
+                elif setting_text[setting_index] == "Info":
+                    with state.acquire_lock():
+                        state.setting_info_view = True
+                        state.setting_editing = False
             elif current_mode == active_test_mode:
                 with state.acquire_lock():
                     in_test = state.active_test_in_test
+                    active_idx = state.active_test_index
 
                 if not in_test:
-                    with state.acquire_lock():
-                        state.active_test_in_test = True
-                        state.active_test_editing = False
+                    if active_idx == 4:
+                        with state.acquire_lock():
+                            state.active_test_in_test = True
+                            state.active_test_editing = True
+                            selected_cylinders = set(state.active_test_power_balance_cylinders_off)
+                            state.active_test_power_balance_cursor = min(selected_cylinders) if selected_cylinders else 0
+                    elif active_idx in {0, 1, 2, 3, 5}:
+                        with state.acquire_lock():
+                            state.active_test_editing = not state.active_test_editing
+                    else:
+                        run_active_test_action_fn(port_obj, demo_mode, state, send_activation_command_fn)
                 else:
                     run_active_test_action_fn(port_obj, demo_mode, state, send_activation_command_fn)
             elif current_mode == digital_bits_mode:
@@ -231,6 +274,7 @@ def process_buttons(
                         state.active_test_editing = False
                     if selected_mode == settings_mode:
                         state.setting_in_item = False
+                        state.setting_info_view = False
                         state.setting_editing = False
 
                 if selected_mode == dtc_mode:

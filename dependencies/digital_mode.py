@@ -64,7 +64,7 @@ def update_digital_register_values(
 
 def update_digital_registers_from_demo(state: Any, elapsed_seconds: float) -> None:
     with state.acquire_lock():
-        power_balance = state.active_test_power_balance_cylinder_off
+        power_balance = set(state.active_test_power_balance_cylinders_off)
         fuel_pump_off = state.active_test_fuel_pump_off
 
     reg13 = 0
@@ -105,7 +105,7 @@ def update_digital_registers_from_demo(state: Any, elapsed_seconds: float) -> No
         reg21 |= (1 << 7)
     if np.sin(elapsed_seconds * 1.1 + 0.3) > 0.55:
         reg21 |= (1 << 6)
-    if power_balance == 0:
+    if not power_balance:
         reg21 |= (1 << 5)
 
     update_digital_register_values(state, reg13, reg1e, reg1f, reg21)

@@ -329,6 +329,7 @@ class GaugeNeedleDisplay:
         value_text: str | None = None,
         warning_text: str | None = None,
         warning_lines: list[str] | None = None,
+        footer_text: str | None = None,
     ) -> Image.Image:
         if show_dial:
             image = self._get_static_background(title).copy()
@@ -401,6 +402,12 @@ class GaugeNeedleDisplay:
         if show_value_text and value_str:
             draw.text((value_x, value_y), value_str, font=self.value_font, fill=(255, 220, 120))
 
+        footer_bottom_limit = height - 2
+        footer_font = ImageFont.load_default()
+        if footer_text and not show_dial:
+            _footer_w, footer_h = self._text_size(draw, footer_text, footer_font)
+            footer_bottom_limit = max(no_dial_content_top, height - footer_h - 8)
+
         if unit_str:
             if not show_dial and not show_value_text:
                 wrapped_unit_lines = self._wrap_text_lines(
@@ -414,8 +421,8 @@ class GaugeNeedleDisplay:
                 unit_line_sizes = [self._text_size(draw, line, self.unit_font) for line in wrapped_unit_lines]
                 unit_block_height = sum(h for _, h in unit_line_sizes) + (unit_line_gap * (len(unit_line_sizes) - 1))
                 unit_y = max(no_dial_content_top, value_y)
-                if unit_y + unit_block_height > height - 2:
-                    unit_y = max(no_dial_content_top, height - unit_block_height - 2)
+                if unit_y + unit_block_height > footer_bottom_limit:
+                    unit_y = max(no_dial_content_top, footer_bottom_limit - unit_block_height)
 
                 y_cursor = unit_y
                 for line, (line_w, line_h) in zip(wrapped_unit_lines, unit_line_sizes):
@@ -430,6 +437,12 @@ class GaugeNeedleDisplay:
                 unit_x = title_center_x - (unit_width // 2)
                 unit_y = unit_y_anchor
                 draw.text((unit_x, unit_y), unit_str, font=self.unit_font, fill=(200, 200, 200))
+
+        if footer_text and not show_dial:
+            _footer_w, footer_h = self._text_size(draw, footer_text, footer_font)
+            footer_x = 8
+            footer_y = height - footer_h - 4
+            draw.text((footer_x, footer_y), footer_text, font=footer_font, fill=(180, 180, 180))
 
         active_warning_lines: list[str] = []
         if warning_lines:
@@ -492,6 +505,7 @@ class GaugeNeedleDisplay:
         value_text: str | None = None,
         warning_text: str | None = None,
         warning_lines: list[str] | None = None,
+        footer_text: str | None = None,
     ) -> None:
         image = self.render_image(
             value,
@@ -503,6 +517,7 @@ class GaugeNeedleDisplay:
             value_text=value_text,
             warning_text=warning_text,
             warning_lines=warning_lines,
+            footer_text=footer_text,
         )
         self.disp.ShowImage(image)
 

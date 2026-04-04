@@ -39,6 +39,7 @@ from dependencies.settings_mode import (
     build_refresh_setting_values_fn,
     build_refresh_units_fn,
     build_show_setting_screen_fn,
+    build_toggle_gauge_display_mode_fn,
     build_toggle_speed_units_fn,
     build_toggle_temp_units_fn,
 )
@@ -207,6 +208,7 @@ def show_gauge(
     value_text: Optional[str] = None,
     warning_text: Optional[str] = None,
     warning_lines: Optional[list[str]] = None,
+    footer_text: Optional[str] = None,
 ) -> None:
     gauge.set_range(minimum, maximum)
     gauge.show_value(
@@ -219,6 +221,7 @@ def show_gauge(
         value_text=value_text,
         warning_text=warning_text,
         warning_lines=warning_lines,
+        footer_text=footer_text,
     )
 
 
@@ -251,6 +254,7 @@ def WriteText(upper: object, lower: object) -> None:
 CONF = "dependencies/configJSON.json"
 Settings = Load_Config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
+Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
 Settings["Log_Index"] += 1
 Save_Config(CONF, Settings)
 Log_Index = int(Settings["Log_Index"])
@@ -265,6 +269,7 @@ Default_Display = int(Settings["Default_Display"])
 RPM_Warning = parse_float(Settings["RPM_Warning"], 6500.0)
 Coolant_Warning = parse_float(Settings["Coolant_Warning"], 220.0)
 Speed_Correction = parse_float(Settings.get("Speed_Correction", 1.0), 1.0)
+Gauge_Display_Mode = str(Settings.get("Gauge_Display_Mode", "Gauge + Value"))
 
 # Gauge display init
 GAUGE_ROTATION = int(os.getenv("CONSULT_GAUGE_ROTATION", "0"))
@@ -329,17 +334,21 @@ SettingText = [
     "Speed Units",
     "Temp Units",
     "Speed Correction",
+    "Gauge Display Mode",
     "Default Display",
     "RPM Warning",
     "Coolant Warning",
+    "Info",
 ]
 
 SETTING_SPEED_UNITS = 0
 SETTING_TEMP_UNITS = 1
 SETTING_SPEED_CORRECTION = 2
-SETTING_DEFAULT_DISPLAY = 3
-SETTING_RPM_WARNING = 4
-SETTING_COOLANT_WARNING = 5
+SETTING_GAUGE_DISPLAY_MODE = 3
+SETTING_DEFAULT_DISPLAY = 4
+SETTING_RPM_WARNING = 5
+SETTING_COOLANT_WARNING = 6
+SETTING_INFO = 7
 SETTINGS_ADJUSTABLE_INDEXES = {
     SETTING_SPEED_CORRECTION,
     SETTING_RPM_WARNING,
@@ -364,6 +373,7 @@ class AppState:
         self.units_temp = units_temp
         self.default_display = default_display
         self.speed_correction = Speed_Correction
+        self.gauge_display_mode = Gauge_Display_Mode
         self.rpm_warning = rpm_warning
         self.coolant_warning = coolant_warning
         
@@ -381,11 +391,14 @@ class AppState:
             speed_unit_label(units_speed),
             temp_unit_label(units_temp),
             f"{Speed_Correction:.2f}",
+            Gauge_Display_Mode,
             DisplayText[default_display],
             f"{int(round(rpm_warning))} RPM",
             f"{int(round(coolant_warning))} {temp_unit_label(units_temp)}",
+            "About",
         ]
         self.setting_in_item = False
+        self.setting_info_view = False
         self.setting_editing = False
 
         # Mode menu state
@@ -403,7 +416,7 @@ class AppState:
         self.active_test_timing_offset_deg = 0
         self.active_test_iaac_offset_steps = 0
         self.active_test_power_balance_cursor = 0
-        self.active_test_power_balance_cylinder_off = 0
+        self.active_test_power_balance_cylinders_off = set()
         self.active_test_fuel_pump_off = False
 
         # Digital bit mode state
@@ -548,6 +561,13 @@ cycle_default_display = build_cycle_default_display_fn(
     DisplayText,
     Save_Config,
     CONF,
+)
+toggle_gauge_display_mode = build_toggle_gauge_display_mode_fn(
+    state,
+    Settings,
+    Save_Config,
+    CONF,
+    refresh_setting_values,
 )
 
 
@@ -758,6 +778,7 @@ try:
             toggle_speed_units,
             toggle_temp_units,
             cycle_default_display,
+            toggle_gauge_display_mode,
         )
 
         # Refresh digital register values for digital bit pages.
@@ -823,6 +844,7 @@ try:
                 rpm_warning = state.rpm_warning
                 coolant_warning = state.coolant_warning
                 units_temp = state.units_temp
+                gauge_display_mode = str(state.gauge_display_mode)
 
             warning_lines: list[str] = []
             if temp_value > coolant_warning:
@@ -842,12 +864,15 @@ try:
             )
 
             if needs_render:
+                show_dial = gauge_display_mode != "Value Only"
                 show_gauge(
                     current_title,
                     current_display_value,
                     current_unit,
                     minimum,
                     maximum,
+                    show_needle=show_dial,
+                    show_dial=show_dial,
                     value_text=current_display_text,
                     warning_lines=warning_lines,
                 )

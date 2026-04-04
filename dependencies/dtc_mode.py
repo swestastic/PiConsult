@@ -46,6 +46,7 @@ def show_dtc_screen(state: Any, show_gauge: Callable[..., None], dtc_titles: dic
         show_needle=False,
         show_dial=False,
         show_value_text=False,
+        footer_text="Select: Clear Codes",
     )
 
 
