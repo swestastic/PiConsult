@@ -1,59 +1,82 @@
-# PiConsult
+# PiConsult by Swestastic
 
 ## Description
 
-This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on a 1990 NA 300zx with the 8-bit ecu. Should work on 16-bit ECUs and other similar-era Nissans like Skylines, Cefiros, 240sx/180sx/Silvia, and some others, but this has not been tested. 1996+ (OBD2) compatibility is not tested yet. The logic is the same as my desktop app, [PyConsult](https://github.com/swestastic/PyConsult), but now it comes in a small form factor which you can leave in your car!
-
-![assembly.gif](images/assembly.gif)
+This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on 1990 NA/MT 300zx and 2001 NA/MT S15 Silvia ECUs. Should support most other similar-era cars, but this has not been tested.
 
 ## Current Functionality
 
-- Reads the following data from the ECU and can display live data on the screen. Displayed value changes with button press
-  - Wheel speed
-  - Engine RPM
-  - Engine coolant temperature
-  - Battery voltage
-  - MAF voltage
-  - AAC duty cycle percentage
-  - Injector timing
-  - Ignition timing
+### Mode 1: Data stream
+
+Reads the following data from the ECU and can display live data on the screen. Displayed value changes with button press of Up/Down. Press Select to see the peak value stored during this drive.
+
+- Engine RPM
+- Wheel speed
+- MAF voltage
+- AAC duty cycle percentage
+- Engine coolant temperature
+- Battery voltage
+- Injector timing
+- Ignition timing
+- Throttle Position
+
+### Mode 2: DTCs
+
+Reading of Data Trouble Codes (DTCs) and ability to clear stored DTCs. Cycle through stored DTCs with Up/Down. Press Select to clear stored ones.
+
+### Mode 3: Settings
+
+Settings adjustment mode with the following options:
+
+- Speed Units (MPH/KPH)
+- Temperature Units (F/C)
+- Speed Correction
+- Default Display
+- RPM Warning threshold
+- Coolant Temp Warning threshold
+
+### Mode 4: Active Test
+
+Active Testing mode with the following functions:
+
+- Manual selection of coolant temp
+- Increase/decrease injector pulse width
+- Increase/decrease base ignition timing
+- Increase/decrease IACV duty cycle
+- Power balance test
+- Fuel pump on/off
+- Clear self learn trims
+
+### Mode 5: Digital Bit Register
+
+View binary values in the ECU that tell you when solenoids or other switches are triggered
+
+- EGR Solenoid
+- Coolant Fan Low
+- Coolant Fan Hi
+- Closed Throttle
+- Start Signal
+- A/C Switch
+- A/C Relay
+- LH Bank Lean
+- RH Bank Lean
+- Fuel Pump Relay
+- VTC Solenoid
+- Wastegate Solenoid
+- P/Reg Control
+- Power Steering
+- IACV/FICD Solenoid
+- Park/Neutral Switch
 
 ## In Testing
 
-- PWM output for Flock Gauge (Requires external DAC)
-- Onboard settings mode with the following adjustments
-  - Gear ratio (factory and adjusted)
-  - Tire size (factory and adjusted)
-  - Speed units: MPH or KPH
-  - Temperature units: Fahrenheit or Celsius
-- Peak values saved and viewable with button press
-- Bypass ECU connection for testing
-- Screen flash for overheating/rev limiter
-
-## Future Functionality
-
-- More data able to be displayed
-  - TPS percentage
-  - TPS open/closed
-  - Clutch switch on/off
-  - Starter signal on/off
-  - Instant and average MPG based on rpm, speed, injector duty cycle, and injector size
-- Data Trouble Codes (DTC) reading and resetting
-- Test mode
-  - Power Balance
-  - EGR on/off
-  - Fuel pump on/off
-  - Clear fuel self learn
-  - Probably others
-- Data logging to SD card
-- WiFi functionality to WebUI read data from phone
-
-- Safe shutdowns (OLED screen is unhappy with random power changes, TFT/LCD coming eventually)
+- More active test options
+- Display items based on ECU P/N (i.e. only display Power Balance cylinder 1-4 for 4-cylinder engines, display both left and right bank O2 sensors for V6 or V8, etc.)
 
 ## Prerequisites
 
 - [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) with Raspbian OS or similar
-- [WaveShare OLED 2.42in screen](https://www.waveshare.com/wiki/2.42inch_OLED_Module)
+- [WaveShare LCD 1.9in screen](https://www.waveshare.com/wiki/1.9inch_LCD_Module)
 - Python 3.x with packages from `requirements.txt`
 - [Nissan Consult Cable](https://conceptzperformance.com/plms-developments-plms-nissan-consult-interface-usb-cable-nistune-datscan-etc-1005_p_5664.php) (There are cheaper consult readers on eBay for $15-$20, but I have not tested these)
 - 3D Printer for printing the 3 included STL files (it is recommended to use a filament that will last inside of a car, such as PETG, ABS, or ASA, especially if it is parked outside)
@@ -70,51 +93,63 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ## Assembly and Installation
 
-*I still have to get photos, sorry!*
-
 First connect all of your wires according to the following pinout:
 
-<!-- INSERT PICTURE OF PINOUT -->
+**Missing Photo**
 
 Next, install the pi into the main body. It should click onto the 4 pegs
 
-<!-- INSERT PICTURE OF PI INSTALLED -->
+**Missing Photo**
 
 Place the OLED screen inside of the sandwich plate and connect the wires on the back
 
-<!-- INSERT PICTURE OF SCREEN ASSEMBLY -->
+**Missing Photo**
 
 Place the 4x buttons in the supplied slots and connect the wires on the back
 
-<!-- INSERT PICTURE OF BUTTONS -->
+**Missing Photo**
 
 Insert the faceplate on top and fasten with 4x screws
 
-<!-- INSERT PICTURE OF ASSEMBLED -->
+**Missing Photo**
 
 Connect to the Pi at the back of the case with a 5V power wire (USB charger in the cigarette lighter is easiest) and connect the consult cable to the USB port using an OTG cable.
 
-<!-- INSERT PICTURE OF WIRES -->
+**Missing Photo**
 
 Connect the other end of the Consult cable underneath the dashboard
 
-<!-- INSERT PICTURE OF PORT -->
+**Missing Photo**
 
 Turn on the car and you should be ready to go! Make sure to configure settings as necessary
 
-<!-- INSERT PICTURE OF RUNNING ASSEMBLY MOUNTED TO CAR -->
+**Missing Photo**
 
 ## Usage
 
 1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
-2. Run the Python script: `python3 main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable power with `sudo chmod +x ConsultStart.sh`
+2. Run the Python script: `python3 Main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable permission with `chmod +x ConsultStart.sh`
 3. The script will start recording data over serial and display it on the SPI display.
-4. You can set up SSH to connect to the device once it is on your network
+4. You can set up SSH to connect to the device once it is on your network. The default address is `kylec@consult.local`.
+
+## Local Desktop Mode (Laptop/Windows/macOS/Linux)
+
+You can run the project without a Raspberry Pi display. A popup window is used as a virtual LCD, and on-screen Mode/Select/Up/Down buttons drive the same app logic. This is largely just used for testing, but you could use it functionally as well.
+
+1. Install dependencies: `pip install -r requirements.txt`
+2. Optional: force desktop mode with `CONSULT_LOCAL_UI=1`
+3. Optional: set popup scale with `CONSULT_LOCAL_SCALE=2` (integer)
+4. Run demo mode locally (no ECU required): `python Main.py --demo`
+
+Notes:
+
+- Desktop mode is selected automatically when Pi hardware dependencies are unavailable.
+- On Raspberry Pi, hardware display and GPIO behavior remain the default unless `CONSULT_LOCAL_UI=1` is set.
 
 ## Configuration
 
-- `Resources/config.py` is configuration settings for the OLED displayas provided by the manufacturer.
-- `configJSON.json` contains default values for variables, most of these are adjustable on the device itself.
+- `Dependencies/config.py` contains hardware configuration for GPIO/SPI/I2C interfaces.
+- `Dependencies/configJSON.json` contains runtime settings and defaults.
 
 ## Acknowledgements
 

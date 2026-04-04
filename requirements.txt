@@ -1,6 +1,6 @@
 pyserial
 Pillow
-gpiozero
 numpy
-smbus
-spidev
+smbus2
+gpiozero; platform_system == "Linux"
+spidev; platform_system == "Linux"

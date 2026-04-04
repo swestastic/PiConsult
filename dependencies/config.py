@@ -29,24 +29,65 @@
 
 
 import time
-from smbus import SMBus
-import spidev
+import importlib
 import ctypes
-from gpiozero import *
+
+try:
+    SMBus = importlib.import_module("smbus").SMBus
+except ModuleNotFoundError:
+    try:
+        SMBus = importlib.import_module("smbus2").SMBus
+    except ModuleNotFoundError:
+        class SMBus:  # type: ignore[no-redef]
+            def __init__(self, *_args, **_kwargs):
+                return None
+
+            def write_byte_data(self, *_args, **_kwargs):
+                return None
+
+            def close(self):
+                return None
+
+try:
+    spidev = importlib.import_module("spidev")
+except ModuleNotFoundError:
+    class _FallbackSpiDev:
+        def __init__(self, *args, **kwargs):
+            self.max_speed_hz = 0
+            self.mode = 0
+
+        def writebytes(self, _data):
+            return None
+
+        def close(self):
+            return None
+
+    class _FallbackSpiModule:
+        SpiDev = _FallbackSpiDev
+
+    spidev = _FallbackSpiModule()
+
+try:
+    _gpiozero = importlib.import_module("gpiozero")
+    DigitalOutputDevice = _gpiozero.DigitalOutputDevice
+    DigitalInputDevice = _gpiozero.DigitalInputDevice
+except ModuleNotFoundError:
+    class DigitalOutputDevice:
+        def __init__(self, *_args, **_kwargs):
+            self.value = 0
+
+        def on(self):
+            self.value = 1
+
+        def off(self):
+            self.value = 0
+
+    class DigitalInputDevice:
+        def __init__(self, *_args, **_kwargs):
+            self.value = 0
 
 Device_SPI = 1
 Device_I2C = 0
-
-Units_Speed = 1
-Units_Temp = 1
-
-Injector_Size = 270
-
-Stock_Final = 4.083
-New_Final = 4.083
-Stock_Tire_Height = 24.9
-New_Tire_Height = 25.1 
-Combined_Ratio = (New_Final/Stock_Final) * (New_Tire_Height/Stock_Tire_Height)
 
 class RaspberryPi:
     def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=10000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
@@ -106,11 +147,5 @@ class RaspberryPi:
             self.bus.close()
         self.digital_write(self.RST_PIN,False)
         self.digital_write(self.DC_PIN,False)
-
-    # def Units():
-    #     if Units_MPH == 1: #convert from kph to mph
-        
-    #     if Units_Farenheight == 1:
-            
 
 ### END OF FILE ###

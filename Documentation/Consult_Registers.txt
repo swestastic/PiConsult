@@ -1,0 +1,1292 @@
+Generic Nissan Engine ECU Register Table.
+This is a list of all known registers and their function. Any particular ECU will only respond to a sub-set of
+these depending on the engine type and configuration. Please report inaccuracies back to the Nissan
+Technical egroup.
+INITIALISATION
+
+0xFF 0xFF 0xEF
+
+SELF DIAGNOSTIC
+ERASE ERROR CODES
+ECU INFO
+
+0xD1
+0xC1
+0xD0
+
+Data Name
+
+Byte
+
+Register No (hex)
+
+Scaling
+
+CAS Position (RPM)
+
+MSB
+
+0x00
+
+See LSB
+
+CAS Position (RPM)
+
+LSB
+
+0x01
+
+Value * 12.5 (RPM)
+
+CAS Reference (RPM)
+
+MSB
+
+0x02
+
+See LSB
+
+CAS Reference (RPM)
+
+LSB
+
+0x03
+
+Value * 8 (RPM) ??
+
+MAF voltage
+
+MSB
+
+0x04
+
+See LSB
+
+MAF voltage
+
+LSB
+
+0x05
+
+Value * 5 (mV)
+
+RH MAF voltage
+
+MSB
+
+0x06
+
+See LSB
+
+RH MAF voltage
+
+LSB
+
+0x07
+
+Value * 5 (mV)
+
+Coolant temp
+
+Single byte
+
+0x08
+
+Value-50 (deg C)
+
+LH O2 Sensor Voltage
+
+Single byte
+
+0x09
+
+Value * 10 (mV)
+
+RH O2 Sensor Voltage
+
+Single byte
+
+0x0a
+
+Value * 10 (mV)
+
+Vehicle speed
+
+Single byte
+
+0x0b
+
+Value * 2 (kph)
+
+Battery Voltage
+
+Single Byte
+
+0x0c
+
+Value * 80 (mV)
+
+Throttle Position Sensor
+
+Single Byte
+
+0x0d
+
+Value * 20 (mV)
+
+FUEL TEMP SEN
+
+Single byte
+
+0x0f
+
+Value-50 (deg C)
+
+Intake Air Temp
+
+Single Byte
+
+0x11
+
+Value -50 (deg C)
+
+Exhaust Gas Temp
+
+Single Byte
+
+0x12
+
+Value * 20 (mV)
+
+Digital Bit Register
+
+Single byte
+
+0x13
+
+See digital register table
+
+Injection Time (LH)
+
+MSB
+
+0x14
+
+See LSB
+
+Injection Time (LH)
+
+LSB
+
+0x15
+
+Value / 100 (mS)
+
+Ignition Timing
+
+Single Byte
+
+0x16
+
+110 – Value (Deg BTDC)
+
+AAC Valve (Idle Air Valve %)
+
+Single Byte
+
+0x17
+
+Value / 2 (%)
+
+A/F ALPHA-LH
+
+Single byte
+
+0x1a
+
+Value (%)
+
+A/F ALPHA-RH
+
+Single byte
+
+0x1b
+
+Value (%)
+
+A/F ALPHA-LH (SELFLEARN)
+
+Single byte
+
+0x1c
+
+Value (%)
+
+A/F ALPHA-RH (SELFLEARN)
+
+Single byte
+
+0x1d
+
+Value (%)
+
+Digital Control Register
+
+Single byte
+
+0x1e
+
+See digital register table
+
+Digital Control Register
+
+Single byte
+
+0x1f
+
+See digital register table
+
+M/R F/C MNT
+
+Single byte
+
+0x21
+
+See digital register table
+
+Injector time (RH)
+
+MSB
+
+0x22
+
+See LSB
+
+Injector time (RH)
+
+LSD
+
+0x23
+
+Value / 100 (mS)
+
+Waste Gate Solenoid %
+
+Single byte
+
+0x28
+
+Turbo Boost Sensor, Voltage
+
+Single byte
+
+0x29
+
+Engine Mount On/Off
+
+Single byte
+
+0x2a
+
+Position Counter
+
+Single byte
+
+0x2e
+
+Purg. Vol. Control Valve, Step
+
+Single byte
+
+0x25
+
+Tank Fuel Temperature, C
+
+Single byte
+
+0x26
+
+FPCM DR, Voltage
+
+Single byte
+
+0x27
+
+Fuel Gauge, Voltage
+
+Single byte
+
+0x2f
+
+FR O2 Heater-B1
+
+Single byte
+
+0x30
+
+Bank 1?
+
+FR O2 Heater-B2
+
+Single byte
+
+0x31
+
+Bank 2?
+
+Ignition Switch
+
+Single byte
+
+0x32
+
+CAL/LD Value, %
+
+Single byte
+
+0x33
+
+B/Fuel Schedule, mS
+
+Single byte
+
+0x34
+
+RR O2 Sensor Voltage
+
+Single byte
+
+0x35
+
+RR O2 Sensor-B2 Voltage
+
+Single byte
+
+0x36
+
+Absolute Throttle Position,
+
+Single byte
+
+0x37
+
+MAF gm/S
+
+Single byte
+
+0x38
+
+Evap System Pressure, Voltage
+
+Single byte
+
+0x39
+
+Absolute Pressure Sensor,
+
+Dual
+
+0x3a, 0x4a
+
+Dual
+
+0x52, 0x53
+
+Bank 2?
+
+Voltage
+
+Voltage
+FPCM F/P Voltage
+
+Reg
+
+Bit 7
+(MSB)
+
+Bit 6
+
+Digital (Bit) registers (1 = Active)
+Bit 5
+Bit 4
+Bit 3
+Bit 2
+
+0x13
+
+0x1e
+
+A/C On
+Switch
+Aircon
+Relay
+
+0x1f
+
+0x21
+
+LH-BANK
+1=LEAN
+
+Fuel
+pump
+Relay
+
+VTC SOL
+
+P/Reg
+control
+valve
+
+Wastegate
+SOL
+
+RH-BANK
+1=LEAN
+
+Power
+Steering
+Sw
+
+IACVFICD
+SOL
+
+Park/Neutral
+Switch
+
+Bit 1
+
+Bit 0
+(LSB)
+
+Start
+Signal
+(Cranking)
+
+CLSD/THL
+POS
+
+Coolant
+Fan Hi
+
+Coolant
+Fan Lo
+EGR SOL
+
+ACTIVE TESTS (0x0A)
+NAME
+
+REG
+
+SCALE
+
+COOLANT TEMP TEST
+
+0x80
+
+VAL=0x50 = 30°C, 0x32 = 0°C, 0x00=-50°C
+
+FUEL INJECTION MAIN SIGNALS
+
+0x81
+
+VAL=0x64 = 0%, 0x6E=+10%, 0x5A=-10%
+
+IGN TIMING TEST
+
+0x82
+
+VAL=0x05=+5 BTDC, 0xFB=-5 BTDC
+
+IACV-AAC/V OPENING
+
+0x84
+
+VAL=0x00 =0%, 0x8C=100%
+
+IACV OPENING
+
+0x85
+
+VAL=0x00 =0%, 0x8C=100%
+
+IACV/FICD-SOLENOID
+
+0x87
+
+VAL=0x00 =OFF
+
+POWER BALANCE TEST
+
+0x88
+
+DIGITAL (see table below), Some ECU types
+use 0x01 to 0x08 to select cylinder (SR20,
+?)
+
+FUEL PUMP RLY TEST
+
+0x89
+
+VAL=0x00 =OFF (0x00 = ON for some ECU,
+SR20 etc)
+
+P/REG CONTROL SOLENOID
+
+0x8A
+
+VAL=0x00 =OFF
+
+SELF LEARN CONTROL
+
+0x8B
+
+VAL=0x00 = CLEAR
+
+IACV-AAC/V CONTROL
+
+0x8C
+
+VAL=0x00 =OFF
+
+VALVE TIMING SOLENOID
+
+0x8F
+
+VAL=0x00 =OFF
+
+MAP SW CONTROL SOLENOID
+
+0x90
+
+VAL=0x00 =OFF
+
+COOLANT FAN LOW SPEED TEST
+
+0x93
+
+VAL=0x00 =OFF
+
+COOLANT FAN HIGH SPEED TEST
+
+0x94
+
+VAL=0x00 =OFF
+
+REGISTER 0x88 (POWERBALANCE)
+Bit 7
+Bit 6
+Bit 5
+CYL8
+CYL7
+CYL6
+1=OFF
+1=OFF
+1=OFF
+0=ON
+0=ON
+0=ON
+
+Bit 4
+CYL5
+1=OFF
+0=ON
+
+Bit 3
+CYL4
+1=OFF
+0=ON
+
+Bit 2
+CYL3
+1=OFF
+0=ON
+
+Bit 1
+CYL2
+1=OFF
+0=ON
+
+Bit 0
+CYL1
+1=OFF
+0=ON
+
+A/T ECU Sensor Register Table.
+INITIALISATION
+
+0xFF 0xFF 0xEA
+
+STREAM ALL AVAILABLE SENSORS
+
+0x9F
+
+SELF DIAGNOSTIC
+
+0xD1
+
+ERASE ERROR CODES
+
+0xC1
+
+ECU INFO
+
+0xF0
+
+NAME
+
+REG
+
+SCALE
+
+VHCL/S SE-A/T
+
+0x00
+
+KM/H
+
+VHCL/S SE-MTR
+
+0x01
+
+KM/H
+
+THRTL POS SEN
+
+0x02
+
+VOLT
+
+VAL/50
+
+FLUID TEMP SEN
+
+0x03
+
+VOLT
+
+VAL/50
+
+BATTERY VOLT
+
+0x04
+
+VOLT
+
+(VAL*8)/100
+
+ENGINE SPEED
+
+0x06
+
+RPM
+
+VAL*32
+
+MULTI 1
+
+0x08
+
+See bit registers
+
+MULTI 2
+
+0x09
+
+See bit registers
+
+MULTI 3
+
+0x0A
+
+See bit registers
+
+GEAR
+
+0x0C
+
+1/2/3/4
+
+SELECT LVR POS
+
+0x0D
+
+N-P/R/D/2/1
+
+VEHICLE SPEED
+
+0x0E
+
+KM/H
+
+THROTTLE POSI
+
+0x0F
+
+%
+
+VAL/2.55
+(VAL*64)/100
+
+LINE PRESS DUTY
+
+0x10
+
+%
+
+TCC S/V DUTY
+
+0x11
+
+%
+
+VAL+1
+$83=N-P, $82=1, $81=2, $80=D, $87=R
+
+Digital (Bit) registers (1 = Active)
+Reg
+
+Bit 7
+
+Bit 6
+
+Bit 5
+
+Bit 4
+
+Bit 3
+
+Bit 2
+
+Bit 1
+
+Bit 0
+
+0x08
+
+KICKDOW
+N SW
+
+CLOSED
+THL/SW
+
+POWE
+RSHIF
+T SW
+
+W/O
+THRTL/P
+-SW
+
+ASCDOD CUT
+
+ASCDCRUISE
+
+R-POS
+SW
+
+OD- SW
+
+HOLD
+SW
+
+OVRRUN/C
+S/V
+
+SHIFT
+S/V B
+
+SHIFT S/V A
+
+0x09
+
+0x0A
+
+P/N POSI
+SW
+
+D-POS SW
+
+2-POS
+SW
+
+1-POS
+SW
+
+S-HICAS ECU Register Table. (hydraulic)
+INITIALISATION
+
+0xFF 0xFF 0xE4
+
+STREAM ALL AVAILABLE SENSORS
+
+0x9F
+
+SELF DIAGNOSTIC
+
+0xD1
+
+ERASE ERROR CODES
+
+0xC1
+
+ECU INFO
+
+0xF0
+
+NAME
+
+REG
+
+SCALE
+
+VHCL SPEED SE
+
+0x01
+
+BYTE
+
+STEERING ANGLE
+
+0x02 , 0x03
+
+WORD
+
+VAL/2
+
+DEGREES
+
+STEERING ANGLE
+
+0x03
+
+BYTE
+
+VAL/2
+
+DEGREES
+
+KM/H
+
+MULTI 1
+
+0x04
+
+BYTE
+
+HICAS SOL
+
+0x05
+
+BYTE
+
+VAL/200
+
+A (Ampere)
+
+POWER STR SOL
+
+0x06
+
+BYTE
+
+VAL/200
+
+A (Ampere)
+
+Digital (Bit) registers (1 = Active)
+Reg
+
+BIT7
+
+BIT6
+
+0x04
+
+BIT5
+
+BIT4
+
+BIT3
+
+BIT2
+
+BIT1
+
+BIT0
+
+ENGINE
+SPD
+
+WOT/PSWITCH
+
+PKB/CLUTCH
+SWITCH
+
+STOPLAMP
+SWITCH
+
+NEUTRAL
+SIGNAL
+
+STEERING
+DIRECTION
+(0=L / 1=R)
+
+0:<1500RPM
+1:>1500RPM
+ACTIVE TESTS (0x0A)
+SIMULATED DRIVE
+
+0x01
+
+0x01=ACTIVE
+
+AIRCON ECU Register Table
+0xFF
+
+INITIALISATION
+
+0xFF
+
+0xDF
+
+SELF DIAGNOSTIC
+
+0xD1
+
+CLEAR ERROR CODES
+
+0xC1
+
+NAME
+
+REG
+
+SCALE
+
+AMBIENT TEMP/S
+
+0x20
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+IN CAR SEN HD
+
+0x21
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+IN CAR SEN FT
+
+0x22
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+DEF DUCT SEN
+
+0x23
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+VENT DUCT SEN
+
+0x24
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+FLOOR DUCT SEN
+
+0x25
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+SUNLOAD
+
+0x26
+
+KCAL
+
+WORD
+
+VAL/160
+
+COOLANT TEMP/S
+
+0x27
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+MODE DOOR PBR
+
+0x28
+
+VOLT
+
+WORD
+
+OBJ TEMP HEAD
+
+0x29
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+OBJ TEMP FOOT
+
+0x2A
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+AIRMIX DOOR 1
+
+0x2B
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+AIRMIX DOOR 2
+
+0x2C
+
+CELCIUS
+
+WORD
+
+VAL/16
+
+MODE DOOR ANGLE
+
+0x2D
+
+DEGREES
+
+WORD
+
+INTAKE DOOR ANGLE
+
+0x2E
+
+DEGREES
+
+WORD
+
+BLOWER MOTOR
+
+0x2F
+
+VOLT
+
+WORD
+
+VAL/16
+
+SET TEMP ADJ
+
+0x40
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+COMPRESSOR
+
+0x41
+
+ON/OFF
+
+BYTE
+
+0x00=OFF
+
+SET TEMP
+
+0x42
+
+°CELCIUS
+
+WORD
+
+VAL/16
+
+MULTI 1
+
+0x43
+
+DIGITAL
+
+BYTE
+
+MULTI 2
+
+0x47
+
+DIGITAL
+
+BYTE
+
+Register
+
+Bit 7
+(MSB)
+
+Bit 6
+
+Bit 5
+
+Bit 4
+
+Bit 3
+
+Bit 2
+
+Bit 1
+
+Bit 0
+(LSB)
+
+0x43
+
+AUTO
+MODE
+
+DEF
+MODE
+
+ECON
+MODE
+
+REC
+MODE
+
+FAN HI
+MODE
+
+FAN LO
+MODE
+
+-
+
+-
+
+0x47
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+UP
+SW
+
+DWN
+SW
+
+ACTIVE TESTS (0x0A)
+AIRMIX DOORS OPERATION
+
+0x2B
+
+(WORD)
+0xE0C0=COOL
+0x1F40=HOT
+0x0080=8°C
+0x0320=50°C
+
+MODE DOOR OPERATION
+
+0x2D
+
+(WORD)
+0x0000=VENT, 0 DEGREES OPEN
+0x0145=B/L, 20 DEGREES OPEN
+0x0330=HEAT, 51 DEGREES OPEN
+0x0528=DEF, 83 DEGREES OPEN
+
+INTAKE DOOR OPERATION
+
+0x2E
+
+(WORD)
+0x0000=IN, 0 DEGREES OPEN
+0x00F0=IN/OUT, 15 DEGREES OPEN
+0x01E0=OUT, 30 DEGREES OPEN
+
+BLOWER MOTOR OPERATION
+
+0x2F
+
+(WORD)
+0x0000=0 VOLT
+0x6000=6 VOLT
+0xC000=12 VOLT
+
+SET DIFF. UPPER/LOWER TARGET TEMP
+
+0x40
+
+(WORD)
+0xFFE0 = SET –2°C (MIN)
+0x0000 = SET 0°C
+0x0020 = SET +2°C (MAX)
+
+CHECK MAGNET CLUTCH OPERATION
+
+0x41
+
+(BYTE) 0x00=OFF
+
+COMPLEX PATTERNS
+
+0x44
+
+(BYTE) DIGITAL (see table)
+
+
