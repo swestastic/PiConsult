@@ -4,7 +4,12 @@ import os
 import threading
 from typing import Any, Callable, Optional
 
-from PIL import Image, ImageTk
+from PIL import Image
+
+try:
+    from PIL import ImageTk
+except ImportError:
+    ImageTk = None
 
 
 _BUTTON_REGISTRY: dict[int, "LocalButton"] = {}
@@ -47,6 +52,9 @@ class DesktopDisplay:
     def __init__(self, scale: int = 2, title: str = "Consult Box - Local Display") -> None:
         import tkinter as tk
 
+        if ImageTk is None:
+            raise ImportError("PIL.ImageTk is unavailable; install Tk support to use DesktopDisplay")
+
         self._tk = tk
         self._root = tk.Tk()
         self._root.title(title)
@@ -64,11 +72,11 @@ class DesktopDisplay:
         container = tk.Frame(self._root, bg="#101214", padx=12, pady=12)
         container.grid(row=0, column=0)
 
-        self._mode_btn = self._make_button(container, "Mode", 17)
+        self._mode_btn = self._make_button(container, "Mode", 26)
         self._mode_btn.grid(row=0, column=0, sticky="w")
 
-        self._select_btn = self._make_button(container, "Select", 26)
-        self._select_btn.grid(row=0, column=2, sticky="e")
+        self._select_btn = self._make_button(container, "Select", 16)
+        self._select_btn.grid(row=2, column=0, sticky="e")
 
         self._display_label = tk.Label(
             container,
@@ -82,10 +90,10 @@ class DesktopDisplay:
 
         # Local UI is not physically rotated like the in-car button layout, so map
         # labels to opposite pins to keep navigation direction intuitive.
-        self._up_btn = self._make_button(container, "Up", 16)
-        self._up_btn.grid(row=2, column=0, sticky="w")
+        self._up_btn = self._make_button(container, "Up", 23)
+        self._up_btn.grid(row=0, column=2, sticky="w")
 
-        self._down_btn = self._make_button(container, "Down", 23)
+        self._down_btn = self._make_button(container, "Down", 17)
         self._down_btn.grid(row=2, column=2, sticky="e")
 
         container.grid_columnconfigure(1, minsize=max(20, self._display_width - 200))

@@ -5,7 +5,10 @@ import threading
 import datetime
 import time
 import os
+from typing import Optional
 
+from dependencies.consult_protocol import extract_first_consult_frame
+from dependencies.consult_registers import DEFAULT_READ_PARAMETERS, build_stream_request, normalize_read_parameters
 from dependencies.settings import Load_Config
 
 
@@ -17,27 +20,44 @@ class ReadStream(threading.Thread):
         self.daemon = daemon
         self.port = port
         self._settings_lock = threading.Lock()
-        self.SPEED_Value = 0
+
         self.RPM_Value = 0
+        self.MAF_Value = 0
+        self.MAF_RH_Value = 0
         self.TEMP_Value = 0
+        self.O2_Value =0
+        self.O2_RH_Value = 0
+        self.SPEED_Value = 0
         self.BATT_Value = 0
         self.TPS_Value = 0
-        self.MAF_Value = 0
-        self.AAC_Value = 0
+        self.FUELTEMP_Value = 0
+        self.IAT_Value = 0
+        self.EGT_Value = 0
         self.INJ_Value = 0
+        self.INJ_RH_Value = 0
         self.TIM_Value = 0
-        self.TPS_Value = 0
+        self.AAC_Value = 0
+
+        self.AFAlpha_Value = 0
+        self.AFAlpha_RH_Value = 0
+        self.AFAlpha_SL_Value = 0
+        self.AFAlpha_RH_SL_Value = 0
+
         self.DIGITAL_13 = 0
         self.DIGITAL_1E = 0
         self.DIGITAL_1F = 0
         self.DIGITAL_21 = 0
 
+        self.register_values: dict[int, int] = {}
+        self._stream_buffer = bytearray()
+        self._stream_started = False
+        self._last_payload_time = time.monotonic()
+        self._last_stream_command_time = 0.0
+
         initial_settings = settings if isinstance(settings, dict) else Load_Config(CONFIG_FILE)
+        self.read_parameters = list(DEFAULT_READ_PARAMETERS)
+        self._stream_needs_restart = True
         self.update_settings(initial_settings)
-        
-        self.Header = 255
-        self.returnBytes = 16
-        fileName = datetime.datetime.now().strftime("%d-%m-%y-%H-%M") # NOTE This is unused
         
         self.start()
 
@@ -48,56 +68,194 @@ class ReadStream(threading.Thread):
             self.settings = dict(source)
             self.units_speed = str(self.settings.get("Units_Speed", "MPH")).upper()
             self.units_temp = str(self.settings.get("Units_Temp", "F")).upper()
-        
-    @staticmethod
-    def check_data_size(data_list):
-        Header = 255
-        returnBytes = 14
+            new_read_parameters = normalize_read_parameters(
+                self.settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS),
+            )
+            if new_read_parameters != self.read_parameters:
+                self.read_parameters = new_read_parameters
+                self._stream_needs_restart = True
+            self._stream_command = build_stream_request(self.read_parameters)
+
+    def _reset_sensor_values(self) -> None:
+        self.RPM_Value = 0
+
+        self.MAF_Value = 0
+        self.MAF_RH_Value = 0
+
+        self.TEMP_Value = 0
+
+        self.O2_Value =0
+        self.O2_RH_Value = 0
+
+        self.SPEED_Value = 0
+        self.BATT_Value = 0
+        self.TPS_Value = 0
+        self.FUELTEMP_Value = 0
+        self.IAT_Value = 0
+        self.EGT_Value = 0
+        self.INJ_Value = 0
+        self.INJ_RH_Value = 0
+        self.TIM_Value = 0
+        self.AAC_Value = 0
+
+        self.DIGITAL_13 = 0
+        self.DIGITAL_1E = 0
+        self.DIGITAL_1F = 0
+        self.DIGITAL_21 = 0
+        self.register_values = {}
+
+    def _write_stream_command(self) -> bool:
         try:
-            if data_list[-4] != Header:
-                return False
-            if data_list[-3] != returnBytes:
-                return False   
-                    
-        except (ValueError, IndexError):
+            if hasattr(self.port, "reset_input_buffer"):
+                self.port.reset_input_buffer()
+            self.port.write(self._stream_command)
+            return True
+        except (serial.SerialException, OSError, ValueError):
             return False
-        return True
+
+    def _stop_stream_command(self) -> bool:
+        try:
+            self.port.write(bytes([0x30]))
+            if hasattr(self.port, "reset_input_buffer"):
+                self.port.reset_input_buffer()
+            return True
+        except (serial.SerialException, OSError, ValueError):
+            return False
+
+    def _read_next_payload(self) -> Optional[bytes]:
+        try:
+            if hasattr(self.port, "read_all"):
+                chunk = self.port.read_all()
+            else:
+                chunk = self.port.read(max(1, self._current_frame_length()))
+        except (serial.SerialException, OSError, ValueError):
+            return None
+
+        if chunk:
+            self._stream_buffer.extend(chunk)
+
+        payload = extract_first_consult_frame(bytes(self._stream_buffer))
+        if payload is None:
+            if len(self._stream_buffer) > 1024:
+                del self._stream_buffer[:-256]
+            return None
+
+        buffer_bytes = bytes(self._stream_buffer)
+        frame_start = buffer_bytes.find(b"\xFF")
+        if frame_start >= 0:
+            frame_end = frame_start + 2 + len(payload)
+            del self._stream_buffer[:frame_end]
+        else:
+            self._stream_buffer.clear()
+
+        return payload
+
+    def _apply_register_value(self, register_code: int, raw_value: int) -> None:
+        if register_code == 0x01:
+            self.RPM_Value = int(self.convertToRev(int(raw_value)))
+
+        elif register_code == 0x05:
+            self.MAF_Value = self.convertToMAF(int(raw_value))
+        elif register_code == 0x07:
+            self.MAF_RH_Value = self.convertToMAF(int(raw_value))
+
+        elif register_code == 0x08:
+            self.TEMP_Value = self.convertToTemp(int(raw_value))
+
+        elif register_code == 0x09:
+            self.O2_Value = self.convertToO2(int(raw_value))
+        elif register_code == 0x0A:
+            self.O2_RH_Value = self.convertToO2(int(raw_value))
+
+        elif register_code == 0x0B:
+            self.SPEED_Value = self.convertToSpeed(int(raw_value))
+        elif register_code == 0x0C:
+            self.BATT_Value = self.convertToBattery(float(raw_value))
+        elif register_code == 0x0D:
+            self.TPS_Value = self.convertToTPS(float(raw_value))
+        elif register_code == 0x0F:
+            self.FUELTEMP_Value = self.convertToTemp(int(raw_value))
+        elif register_code == 0x11:
+            self.IAT_Value = self.convertToTemp(int(raw_value))
+        elif register_code == 0x12:
+            self.EGT_Value = self.convertToEGT(int(raw_value))
+        elif register_code == 0x15:
+            self.INJ_Value = self.convertToInjection(int(raw_value))
+        elif register_code == 0x23:
+            self.INJ_RH_Value = self.convertToInjection(int(raw_value))
+        elif register_code == 0x16:
+            self.TIM_Value = self.convertToTiming(int(raw_value))
+        elif register_code == 0x17:
+            self.AAC_Value = self.convertToAAC(int(raw_value))
+
+        elif register_code == 0x1A:
+            self.AFALpha_Value = float(raw_value)
+        elif register_code == 0x1B:
+            self.AFAlpha_RH_Value = float(raw_value)
+        elif register_code == 0x1C:
+            self.AFAlpha_SL_Value = float(raw_value)
+        elif register_code == 0x1D:
+            self.AFAlpha_RH_SL_Value = float(raw_value)
+
+        elif register_code == 0x13:
+            self.DIGITAL_13 = int(raw_value)
+        elif register_code == 0x1E:
+            self.DIGITAL_1E = int(raw_value)
+        elif register_code == 0x1F:
+            self.DIGITAL_1F = int(raw_value)
+        elif register_code == 0x21:
+            self.DIGITAL_21 = int(raw_value)
+        else:
+            self.register_values[register_code & 0xFF] = int(raw_value)
+
+    def _current_frame_length(self) -> int:
+        with self._settings_lock:
+            return len(self.read_parameters) + 2
                 
     def consume_data(self):
         read_thread = True
         while read_thread == True:
-            incomingData = self.port.read(18) # 0xFF + length byte + 16 register bytes
+            if self._stream_needs_restart:
+                if self._stream_started:
+                    self._stop_stream_command()
+                    time.sleep(0.01)
+                if self._write_stream_command():
+                    self._stream_needs_restart = False
+                    self._stream_started = True
+                    self._stream_buffer.clear()
+                    self._last_stream_command_time = time.monotonic()
+                    self._last_payload_time = self._last_stream_command_time
+                else:
+                    time.sleep(0.05)
+                    continue
+
+            incomingData = self._read_next_payload()
             if not incomingData:
+                now = time.monotonic()
+                no_payload_timeout = 0.75
+                if (
+                    self._stream_started
+                    and not self._stream_needs_restart
+                    and (now - self._last_payload_time) >= no_payload_timeout
+                    and (now - self._last_stream_command_time) >= no_payload_timeout
+                ):
+                    self._stream_needs_restart = True
+                    self._stream_started = False
+                    self._stream_buffer.clear()
                 time.sleep(0.002)
                 continue
 
             dataList = list(incomingData)
-
-            if len(dataList) < 16:
-                time.sleep(0.002)
-                continue
-
-            # if not self.check_data_size(dataList): ## NOTE BROKEN!! FIX ME!!!
-            #     continue
+            self._last_payload_time = time.monotonic()
                 
             try:
-                self.SPEED_Value = int(self.convertToSpeed(int(dataList[-2])))
-                self.RPM_Value = int(self.convertToRev(int(dataList[-1])))
-                self.TEMP_Value = self.convertToTemp(int(dataList[0]))
-                self.BATT_Value = self.convertToBattery(float(dataList[1]))
-                self.TPS_Value = self.convertToTPS(float(dataList[2])) # Not sure if this is the correct value in dataList
-                self.MAF_Value = self.convertToMAF(int(dataList[5]))
-                self.AAC_Value = self.convertToAAC(int(dataList[8]))
-                self.INJ_Value = self.convertToInjection(int(dataList[6])) # Not sure if this is the correct value in dataList
-                self.TIM_Value = int(self.convertToTiming(int(dataList[9]))) # Not sure if this is the correct value in dataList
-                self.TPS_Value = self.convertToTPS(float(dataList[2])) # Not sure if this is the correct value in dataList
+                self._reset_sensor_values()
 
-                # Expose digital bit registers for UI pages.
-                # Stream now includes 0x13, 0x1E, 0x1F, and 0x21.
-                self.DIGITAL_13 = int(dataList[8])
-                self.DIGITAL_1E = int(dataList[13])
-                self.DIGITAL_1F = int(dataList[14])
-                self.DIGITAL_21 = int(dataList[15])
+                with self._settings_lock:
+                    active_parameters = list(self.read_parameters)
+
+                for register_code, raw_value in zip(active_parameters, dataList):
+                    self._apply_register_value(int(register_code), int(raw_value))
 
             except (ValueError, IndexError):
                 pass
@@ -105,9 +263,23 @@ class ReadStream(threading.Thread):
         return self.SPEED_Value, self.RPM_Value, self.TEMP_Value, self.BATT_Value, self.TPS_Value, self.MAF_Value, self.AAC_Value, self.INJ_Value, self.TIM_Value
 
     def run(self):
-        self.port.write(bytes([0x5A,0x0B,0x5A,0x01,0x5A,0x08,0x5A,0x0C,0x5A,0x0D,0x5A,0x03,0x5A,0x05,0x5A,0x09,0x5A,0x13,0x5A,0x16,0x5A,0x17,0x5A,0x1A,0x5A,0x1C,0x5A,0x1E,0x5A,0x1F,0x5A,0x21,0xF0]))
-        #/ Speed / CAS-RPM / CoolantTemp / BatteryVoltage / ThrottlePosition / CAS-RPM / MAF / LH02 / Digital(0x13) / IgnitionTiming / AAC / AFAlphaL / AFAlphaLSelfLear / Digital(0x1E) / Digital(0x1F) / M-R F-C Mnt(0x21) /
-        self.consume_data() 
+        self.consume_data()
+
+    def convertToRev(self,inputData): # RPM
+        return int(round((inputData * 12.5),2)) 
+
+    def convertToMAF(self,inputData): # Volts
+        return inputData * 5 / 1000
+    
+    def convertToTemp(self,inputData):
+        with self._settings_lock:
+            units_temp = self.units_temp
+        if units_temp == 'F':
+            return (inputData - 50) * 9/5 + 32
+        return inputData - 50
+    
+    def convertToO2(self,inputData): # Volts
+        return inputData * 10 / 1000
 
     def convertToSpeed(self,inputData):
         with self._settings_lock:
@@ -116,21 +288,14 @@ class ReadStream(threading.Thread):
             return int(round((inputData * 2.11) * 0.621371192237334))
         return int(round((inputData * 2.11)))
 
-    def convertToTemp(self,inputData):
-        with self._settings_lock:
-            units_temp = self.units_temp
-        if units_temp == 'F':
-            return (inputData - 50) * 9/5 + 32
-        return inputData - 50
-
-    def convertToRev(self,inputData): # RPM
-        return int(round((inputData * 12.5),2))
-
     def convertToBattery(self,inputData): # Volts
         return round(((inputData * 80) / 1000),1)
+    
+    def convertToTPS(self,inputData): # Volts
+        return inputData * 20 / 1000
 
-    def convertToMAF(self,inputData): # Volts
-        return inputData * 5 / 1000
+    def convertToEGT(self,inputData): # Degrees F
+        return inputData * 20 / 1000
 
     def convertToAAC(self,inputData):  # % Duty Cycle
         return inputData / 2
@@ -140,10 +305,3 @@ class ReadStream(threading.Thread):
 
     def convertToTiming(self,inputData): # Degrees BTDC
         return 110 - inputData
-    
-    def convertToTPS(self,inputData): # Volts
-        return inputData * 20 / 1000
-
-    def logToFile(self,data,fileName):
-        with open(fileName + '.hex', 'a+') as logFile:
-            logFile.write(data)

@@ -1,17 +1,14 @@
 import os
 import argparse
 import time
-import datetime
-from functools import partial
 import serial
 import threading
-import socket
-import subprocess
+from functools import lru_cache
+from pathlib import Path
 import numpy as np
 from typing import Optional, Any
 from PIL import Image, ImageDraw, ImageFont
 
-from dependencies import config
 from dependencies.Buttons import process_buttons as process_button_events, setup_button_callbacks
 from dependencies.dtc_dict import dtc_codes as DTC_CODE_TITLES
 from dependencies.settings import Load_Config, Save_Config
@@ -32,13 +29,24 @@ from dependencies.active_test_mode import (
     run_active_test_action,
     show_active_test_screen,
 )
+from dependencies.consult_registers import (
+    DEFAULT_READ_PARAMETERS,
+    READ_PARAMETER_OPTIONS,
+    get_selected_digital_registers,
+    get_selected_stream_codes,
+    get_stream_unit,
+    read_parameter_label,
+    read_parameter_title,
+)
 from dependencies.settings_mode import (
     build_adjust_setting_value_fn,
     build_apply_settings_to_runtime_fn,
     build_cycle_default_display_fn,
+    build_finalize_read_parameters_fn,
     build_refresh_setting_values_fn,
     build_refresh_units_fn,
     build_show_setting_screen_fn,
+    build_toggle_read_parameter_fn,
     build_toggle_gauge_display_mode_fn,
     build_toggle_speed_units_fn,
     build_toggle_temp_units_fn,
@@ -49,7 +57,6 @@ from dependencies.consult_protocol import (
     send_activation_command as protocol_send_activation_command,
 )
 from dependencies.digital_mode import (
-    DIGITAL_REGISTER_ORDER,
     show_digital_bits_screen,
     update_digital_registers_from_demo,
     update_digital_registers_from_reader,
@@ -84,50 +91,7 @@ if Button is None:
     raise RuntimeError("No supported button backend found (gpiozero or local UI)")
 
 
-def get_local_ip() -> str:
-    # 1) Prefer interface IPs (works even without internet route).
-    for interface_name in (os.getenv("CONSULT_BOX_WLAN", "wlan0"), "eth0"):
-        try:
-            result = subprocess.run(
-                ["ip", "-4", "-o", "addr", "show", "dev", interface_name],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
-            for line in result.stdout.splitlines():
-                parts = line.split()
-                if "inet" in parts:
-                    ip_with_mask = parts[parts.index("inet") + 1]
-                    ip_addr = ip_with_mask.split("/", 1)[0]
-                    if ip_addr:
-                        return ip_addr
-        except (subprocess.TimeoutExpired, ValueError, OSError):
-            # Interface may not exist, timeout, or parsing error - try next one
-            pass
-
-    # 2) Fallback to route-based discovery (requires reachable route).
-    for probe_host in ("8.8.8.8", "1.1.1.1"):
-        sock = None
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(1.0)
-            sock.connect((probe_host, 80))
-            return sock.getsockname()[0]
-        except OSError:
-            # Offline/no route is valid in AP mode.
-            pass
-        except Exception as exc:
-            WriteLog(Log_Index, exc, "Getting local IP address")
-        finally:
-            try:
-                if sock is not None:
-                    sock.close()
-            except OSError:
-                # Socket already closed or other socket error
-                pass
-
-    return "N/A"
+READ_PARAMETER_CODES = [option.code for option in READ_PARAMETER_OPTIONS]
 
 
 def parse_float(value: object, default: float = 0.0) -> float:
@@ -156,43 +120,145 @@ def temp_unit_label(units_temp: object) -> str:
     return "C"
 
 
-def get_metric_range(index: int) -> tuple[float, float]:
-    speed_max = 150.0 if speed_unit_label(Units_Speed) == "MPH" else 240.0
-    temp_max = 260.0 if temp_unit_label(Units_Temp) == "F" else 130.0
-
-    ranges = [
-        (0.0, 8000.0), # RPM
-        (0.0, speed_max), # SPEED
-        (0.0, 5.0), # MAF
-        (0.0, 100.0), # AAC
-        (20.0, temp_max), # TEMP
-        (6.0, 16.0), # BATT
-        (0.0, 100.0), # INJ
-        (0.0, 70.0), # TIM
-        (0.0, 5.0), # TPS
-    ]
-    return ranges[index]
-
-
-INT_METRIC_INDEXES = {0, 1, 3, 4, 7}  # RPM, SPEED, AAC, TEMP, TIM
-DEC_1_METRIC_INDEXES = {5, 6}  # BATT, INJ
-
-
-def format_metric_value(index: int, value: float) -> float:
-    """Format metric values for display: selected metrics as ints, others to 2 decimals."""
-    if index in INT_METRIC_INDEXES:
-        return float(int(round(value)))
-    if index in DEC_1_METRIC_INDEXES:
-        return float(round(value, 1))
-    return float(round(value, 2))
-
-
-def format_metric_text(index: int, value: float) -> str:
-    if index in INT_METRIC_INDEXES:
+def format_stream_value_text(code: int, value: float, unit: str) -> str:
+    if unit == "raw":
         return f"{int(round(value))}"
-    if index in DEC_1_METRIC_INDEXES:
+    if unit in {"ms", "g/s"}:
+        return f"{value:.2f}"
+    if code in {0x01, 0x0B, 0x08, 0x16}:
+        return f"{int(round(value))}"
+    if code in {0x0C, 0x09}:
         return f"{value:.1f}"
     return f"{value:.2f}"
+
+
+def build_demo_stream_value_map(elapsed_seconds: float) -> dict[int, float]:
+    values = get_demo_values(elapsed_seconds)
+    return {
+        0x01: float(values[0]),
+
+        0x05: float(values[1]),
+        0x07: float(values[1]),
+
+        0x08: float(values[2]),
+
+        0x09: float(values[3]),
+        0x0A: float(values[3]),
+
+        0x0B: float(values[4]),
+        0x0C: float(values[5]),
+        0x0D: float(values[6]),
+        0x0F: float(values[7]),
+        0x0D: float(values[8]),
+        0x11: float(values[9]),
+        0x12: float(values[10]),
+        0x15: float(values[10]),
+        0x23: float(values[11]),
+        0x16: float(values[12]),
+        0x17: float(values[13]),
+        0x1A: float(values[13]),
+        0x1B: float(values[13]),
+        0x1C: float(values[13]),
+        0x1D: float(values[13]),
+    }
+
+
+def get_stream_value_for_code(code: int, reader: Optional[object], demo_value_map: dict[int, float], speed_correction: float) -> float:
+    if code == 0x0B:
+        return float(demo_value_map.get(code, 0.0) * speed_correction) if reader is None else float(getattr(reader, "SPEED_Value", 0.0)) * speed_correction
+    if code == 0x01:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "RPM_Value", 0.0))
+    if code == 0x08:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TEMP_Value", 0.0))
+    if code == 0x0C:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "BATT_Value", 0.0))
+    if code == 0x0D:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TPS_Value", 0.0))
+    if code == 0x03:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "MAF_Value", 0.0))
+    if code == 0x09:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "INJ_Value", 0.0))
+    if code == 0x16:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TIM_Value", 0.0))
+    if code == 0x17:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "AAC_Value", 0.0))
+
+    if reader is None:
+        return float(demo_value_map.get(code, 0.0))
+
+    with_units_temp = Units_Temp
+    raw_values = getattr(reader, "register_values", {})
+    raw_value = float(raw_values.get(code, 0.0))
+
+    if code in {0x03, 0x04, 0x05, 0x06, 0x07, 0x12, 0x27, 0x29, 0x2F, 0x35, 0x36, 0x39}:
+        return raw_value * 5.0 / 1000.0
+
+    if code in {0x0A}:
+        return raw_value * 10.0 / 1000.0
+
+    if code in {0x0F, 0x11, 0x26}:
+        temp_c = raw_value - 50.0
+        if str(with_units_temp).upper() == "F":
+            return (temp_c * 9.0 / 5.0) + 32.0
+        return temp_c
+
+    if code in {0x15}:
+        msb = int(raw_values.get(0x14, 0)) & 0xFF
+        lsb = int(raw_values.get(0x15, 0)) & 0xFF
+        return float(((msb << 8) | lsb) / 100.0)
+
+    if code in {0x23}:
+        msb = int(raw_values.get(0x22, 0)) & 0xFF
+        lsb = int(raw_values.get(0x23, 0)) & 0xFF
+        return float(((msb << 8) | lsb) / 100.0)
+
+    if code in {0x1A, 0x1B, 0x1C, 0x1D}:
+        return raw_value
+
+    if code in {0x28}:
+        return raw_value / 2.0
+
+    if code in {0x33}:
+        return raw_value / 2.55
+
+    if code in {0x38}:
+        return raw_value
+
+    return float(raw_values.get(code, 0.0))
+
+
+def get_stream_range(code: int, units_speed: object, units_temp: object) -> tuple[float, float]:
+    speed_max = 150.0 if str(units_speed).upper() == "MPH" else 240.0
+    temp_max = 260.0 if str(units_temp).upper() == "F" else 130.0
+
+    ranges = {
+        0x01: (0.0, 8000.0), # RPM
+
+        0x05: (0.0, 5.0), # MAF (LH)
+        0x07: (0.0, 5.0), # MAF (RH)
+
+        0x08: (20.0, temp_max), # Coolant Temp
+
+        0x09: (0.0, 100.0), # LH O2 
+        0x0A: (0.0, 100.0), # RH O2
+
+        0x0B: (0.0, speed_max), # Speed
+        0x0C: (8.0, 15.0), # Battery Voltage
+        0x0D: (0.0, 5.0), # TPS
+        0x0F: (20.0, temp_max), # Fuel Temp
+        0x11: (20.0, temp_max), # IAT
+        0x12: (20.0, temp_max), # EGT
+        0x15: (0.0, 20.0), # Injection Time (LH)
+        0x23: (0.0, 20.0), # Injection Time (RH)
+        0x16: (0.0, 70.0), # Ignition Timing
+        0x17: (0.0, 100.0), # AAC Duty Cycle
+
+        0x1A: (60.0, 140.0), # AF Alpha (LH)
+        0x1B: (60.0, 140.0), # AF Alpha (RH)
+        0x1C: (60.0, 140.0), # AF Alpha Self learn (LH)
+        0x1D: (60.0, 140.0), # AF Alpha Self learn (RH)
+    }
+    return ranges.get(code, (0.0, 255.0))
 
 
 def show_gauge(
@@ -225,17 +291,6 @@ def show_gauge(
     )
 
 
-def debug_log(context: str, message: object) -> None:
-    timestamp = datetime.datetime.now().isoformat(timespec="seconds")
-    formatted = f"[{timestamp}] {context}: {message}"
-    print(formatted)
-    try:
-        WriteLog(Log_Index, formatted, "debug")
-    except (IOError, OSError):
-        # Log file write failed, but don't crash - message already on stdout
-        pass
-
-
 def WriteText(upper: object, lower: object) -> None:
     title = str(upper) if upper is not None else ""
     lower_text = str(lower) if lower is not None else ""
@@ -251,10 +306,11 @@ def WriteText(upper: object, lower: object) -> None:
 
 
 # Load configs
-CONF = "dependencies/configJSON.json"
+CONF = os.path.join(os.path.dirname(__file__), "dependencies", "configJSON.json")
 Settings = Load_Config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
 Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
+Settings.setdefault("Read_Parameters", list(DEFAULT_READ_PARAMETERS))
 Settings["Log_Index"] += 1
 Save_Config(CONF, Settings)
 Log_Index = int(Settings["Log_Index"])
@@ -288,10 +344,10 @@ DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30")
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
 
 # Buttons
-ModeButton = Button(17, hold_time=0.5)
-SelectButton = Button(26, hold_time=0.5)
-UpButton = Button(23, hold_time=0.5)
-DownButton = Button(16, hold_time=0.5)
+ModeButton = Button(26, hold_time=0.5) #17
+SelectButton = Button(16, hold_time=0.5) #26
+UpButton = Button(23, hold_time=0.5) #23
+DownButton = Button(17, hold_time=0.5) #16
 
 # Mode constants
 DISPLAY_MODE = 0
@@ -338,6 +394,7 @@ SettingText = [
     "Default Display",
     "RPM Warning",
     "Coolant Warning",
+    "Read Parameters",
     "Info",
 ]
 
@@ -348,7 +405,8 @@ SETTING_GAUGE_DISPLAY_MODE = 3
 SETTING_DEFAULT_DISPLAY = 4
 SETTING_RPM_WARNING = 5
 SETTING_COOLANT_WARNING = 6
-SETTING_INFO = 7
+SETTING_READ_PARAMETERS = 7
+SETTING_INFO = 8
 SETTINGS_ADJUSTABLE_INDEXES = {
     SETTING_SPEED_CORRECTION,
     SETTING_RPM_WARNING,
@@ -365,8 +423,7 @@ class AppState:
         # Display and UI state
         self.current_mode = DISPLAY_MODE
         self.display_index = default_display
-        self.display_values = np.zeros(len(DisplayText))
-        self.peak_values = np.zeros(len(DisplayText))
+        self.stream_peak_values: dict[int, float] = {}
         
         # Settings state
         self.units_speed = units_speed
@@ -384,6 +441,8 @@ class AppState:
         self.dtc_status_until = 0.0
         self.dtc_clear_confirm_active = False
         self.dtc_clear_confirm_yes = False
+
+        safe_display_idx = default_display % max(1, len(DisplayText))
         
         # Settings menu state
         self.setting_index = 0
@@ -392,14 +451,20 @@ class AppState:
             temp_unit_label(units_temp),
             f"{Speed_Correction:.2f}",
             Gauge_Display_Mode,
-            DisplayText[default_display],
+            DisplayText[safe_display_idx],
             f"{int(round(rpm_warning))} RPM",
             f"{int(round(coolant_warning))} {temp_unit_label(units_temp)}",
+            f"{len(DEFAULT_READ_PARAMETERS)} Selected",
             "About",
         ]
         self.setting_in_item = False
         self.setting_info_view = False
         self.setting_editing = False
+        self.read_parameters_dirty = False
+        self.read_parameter_index = 0
+        self.stream_display_codes: list[int] = []
+        self.stream_display_labels: list[str] = []
+        self.stream_display_values: dict[int, float] = {}
 
         # Mode menu state
         self.mode_menu_index = 0
@@ -432,6 +497,7 @@ class AppState:
         # Render tracking state
         self.last_display_render_time = 0.0
         self.last_display_index = -1
+        self.last_display_code = -1
         self.last_display_value = 0.0
         self.last_display_unit = ""
         self.last_warning_render_time = 0.0
@@ -441,21 +507,13 @@ class AppState:
         self.read_thread_active = False
         self.showing_peak = False
 
-    def update_display_values(self, values: np.ndarray) -> None:
-        """Thread-safe update of display values and peaks."""
+    def update_stream_peaks(self, values: dict[int, float]) -> None:
+        """Track max observed value per register code."""
         with self._lock:
-            self.display_values[:] = values
-            self.peak_values[:] = np.maximum(self.peak_values, self.display_values)
-
-    def get_display_values(self) -> np.ndarray:
-        """Thread-safe read of display values."""
-        with self._lock:
-            return self.display_values.copy()
-
-    def get_peak_values(self) -> np.ndarray:
-        """Thread-safe read of peak values."""
-        with self._lock:
-            return self.peak_values.copy()
+            for code, value in values.items():
+                previous_peak = self.stream_peak_values.get(code)
+                if previous_peak is None or value > previous_peak:
+                    self.stream_peak_values[code] = value
 
     def get_display_index(self) -> int:
         """Get current display index."""
@@ -513,8 +571,10 @@ refresh_units = build_refresh_units_fn(
 )
 show_setting_screen = build_show_setting_screen_fn(
     state,
+    Settings,
     SettingText,
     SETTINGS_ADJUSTABLE_INDEXES,
+    READ_PARAMETER_OPTIONS,
     gauge,
     show_gauge,
 )
@@ -569,28 +629,71 @@ toggle_gauge_display_mode = build_toggle_gauge_display_mode_fn(
     CONF,
     refresh_setting_values,
 )
+toggle_read_parameter = build_toggle_read_parameter_fn(
+    state,
+    Settings,
+    Save_Config,
+    CONF,
+    refresh_setting_values,
+)
+finalize_read_parameters_update = build_finalize_read_parameters_fn(
+    state,
+    Settings,
+    update_reader_settings,
+    refresh_setting_values,
+)
 
 
 def Show_Peak(idx: int) -> None:
     with state.acquire_lock():
         state.showing_peak = True
-        peak_val = float(state.peak_values[idx])
-    
-    minimum, maximum = get_metric_range(idx)
+        stream_codes = list(state.stream_display_codes)
+        stream_values = dict(state.stream_display_values)
+        stream_peaks = dict(state.stream_peak_values)
+        units_speed = state.units_speed
+        units_temp = state.units_temp
+
+    if idx < 0 or idx >= len(stream_codes):
+        with state.acquire_lock():
+            state.showing_peak = False
+        return
+
+    code = stream_codes[idx]
+    label = read_parameter_title(code)
+    unit = get_stream_unit(code, units_speed, units_temp)
+    peak_value = float(stream_peaks.get(code, stream_values.get(code, 0.0)))
+    minimum, maximum = get_stream_range(code, units_speed, units_temp)
+    value_text = format_stream_value_text(code, peak_value, unit)
     show_gauge(
-        f"{DisplayText[idx]} PEAK",
-        format_metric_value(idx, peak_val),
-        Units[idx],
+        f"{label} PEAK",
+        peak_value,
+        unit,
         minimum,
         maximum,
+        value_text=value_text,
     )
+
     time.sleep(1.5)
-    
+
     with state.acquire_lock():
         state.showing_peak = False
 
 
-def show_mode_menu_screen() -> None:
+@lru_cache(maxsize=1)
+def _list_body_font() -> Any:
+    font_dir = Path(__file__).resolve().parent / "dependencies" / "Font"
+    for font_name in ("Font02.ttf", "Font01.ttf", "Font00.ttf"):
+        font_path = font_dir / font_name
+        if not font_path.exists():
+            continue
+        try:
+            return ImageFont.truetype(str(font_path), 18)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def show_mode_menu_screen(display_mode_enabled: bool, digital_mode_enabled: bool) -> None:
     with state.acquire_lock():
         mode_menu_index = state.mode_menu_index
 
@@ -603,25 +706,37 @@ def show_mode_menu_screen() -> None:
     title_width, _ = gauge._text_size(draw, title, gauge.label_font)
     draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
 
-    body_font = ImageFont.load_default()
+    body_font = _list_body_font()
     start_y = 36
     bottom_margin = 18
-    row_height = max(13, (height - start_y - bottom_margin) // len(MODE_MENU_ITEMS))
+    max_visible_rows = 5
+    total_rows = len(MODE_MENU_ITEMS)
+    visible_rows = min(max_visible_rows, total_rows)
+    row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
+    visible_start = max(0, min(mode_menu_index - (visible_rows // 2), max(total_rows - visible_rows, 0)))
+    visible_end = min(total_rows, visible_start + visible_rows)
 
-    for idx, label in enumerate(MODE_MENU_ITEMS):
-        y = start_y + (idx * row_height)
+    mode_enabled = [display_mode_enabled, True, True, digital_mode_enabled, True]
+
+    for visible_row, idx in enumerate(range(visible_start, visible_end)):
+        label = MODE_MENU_ITEMS[idx]
+        y = start_y + (visible_row * row_height)
         is_selected = idx == mode_menu_index
+        is_enabled = mode_enabled[idx]
 
         if is_selected:
-            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
 
         pointer = ">" if is_selected else " "
         line = f"{pointer} {label}"
-        text_color = (240, 240, 240) if is_selected else (165, 165, 165)
+        if is_enabled:
+            text_color = (240, 240, 240) if is_selected else (165, 165, 165)
+        else:
+            text_color = (120, 120, 120)
         draw.text((8, y + 2), line, font=body_font, fill=text_color)
 
     footer = "Up/Down: Navigate  Select: Open"
-    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+    draw.text((8, height - 20), footer, font=body_font, fill=(180, 180, 180))
 
     if gauge.rotation_degrees:
         image = image.rotate(gauge.rotation_degrees)
@@ -647,16 +762,21 @@ def send_activation_command(
 
 def get_demo_values(elapsed_seconds: float) -> list[float]:
     rpm = 900.0 + 5000.0 * (0.6 + 0.6 * np.sin(elapsed_seconds * 1.6))
-    speed = 10.0 + 95.0 * (0.7 + 0.7 * np.sin(elapsed_seconds * 0.9))
     maf = 0.6 + 3.6 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.1 + 1.2))
-    aac = 8.0 + 62.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.3 + 2.3))
     temp = 120.0 + 45.0 * (0.5 + 2 * np.sin(elapsed_seconds + 1.4))
+    o2 = 0.1 + 0.9 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.3 + 0.7))
+    speed = 10.0 + 95.0 * (0.7 + 0.7 * np.sin(elapsed_seconds * 0.9))
     batt = 12.8 + 1.2 * (0.5 + 0.5 * np.sin(elapsed_seconds * 0.55 + 1.4))
+    tps = 0.4 + 3.9 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.5 + 1.8))
+    fueltemp = 100.0 + 20.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.2 + 1.6))
+    iat = 0.5 + 0.45 * np.sin(elapsed_seconds * 1.4 + 0.9)
+    egt = 300.0 + 400.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 0.8 + 2.1))
     inj = 2.0 + 48.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.4 + 0.4))
     tim = 5.0 + 32.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.0 + 2.0))
-    tps = 0.4 + 3.9 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.5 + 1.8))
+    aac = 8.0 + 62.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.3 + 2.3))
+    afalpha = 0.5 + 0.45 * np.sin(elapsed_seconds * 1.2 + 0.3)
 
-    return [rpm, speed, maf, aac, temp, batt, inj, tim, tps]
+    return [rpm, maf, temp, o2, speed, batt, tps, fueltemp, iat, egt, inj, tim, aac, afalpha]
 
 
 def pump_local_ui_events() -> bool:
@@ -669,16 +789,18 @@ def pump_local_ui_events() -> bool:
     return True
 
 
-def PortConnect(port_obj: object, ip_addr: str) -> tuple[Optional[serial.Serial], str]:
-    WriteText("Connecting...", ip_addr)
+def PortConnect(port_obj: object) -> Optional[serial.Serial]:
+    WriteText("Connecting...", "Serial")
     try:
-        return serial.Serial("/dev/ttyUSB0", 9600, timeout=None), ip_addr
+        return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)
+        # return serial.Serial("COM6", 9600, timeout=None) # For windows change COM6 to your port
+
     except serial.SerialException as exc:
         WriteLog(Log_Index, exc, "PortConnect - Serial port error")
-        return None, ip_addr
+        return None
     except Exception as exc:
         WriteLog(Log_Index, exc, "PortConnect - Unexpected error")
-        return None, ip_addr
+        return None
 
 
 def ECU_Connect(port_obj: serial.Serial) -> bool:
@@ -725,9 +847,8 @@ if DEMO_MODE:
     read_thread_active = True
 else:
     # Connect serial and ECU
-    IPAddr = get_local_ip()
     while PORT is None:
-        PORT, IPAddr = PortConnect(PORT, IPAddr)
+        PORT = PortConnect(PORT)
         time.sleep(0.1)
 
     ECU_Connected = ECU_Connect(PORT) if PORT is not None else False
@@ -746,6 +867,15 @@ else:
 # Main loop
 try:
     while read_thread_active:
+        selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
+        selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
+        selected_stream_labels = [read_parameter_label(code) for code in selected_stream_codes]
+        selected_digital_registers = get_selected_digital_registers(selected_read_parameters)
+
+        with state.acquire_lock():
+            state.stream_display_codes = list(selected_stream_codes)
+            state.stream_display_labels = list(selected_stream_labels)
+
         if not pump_local_ui_events():
             read_thread_active = False
             break
@@ -753,10 +883,12 @@ try:
             state,
             PORT,
             DEMO_MODE,
-            DisplayText,
+            selected_stream_codes,
+            selected_stream_labels,
             SettingText,
+            READ_PARAMETER_CODES,
             ACTIVE_TEST_ITEMS,
-            DIGITAL_REGISTER_ORDER,
+            selected_digital_registers,
             SETTINGS_ADJUSTABLE_INDEXES,
             DISPLAY_MODE,
             DTC_MODE,
@@ -779,7 +911,18 @@ try:
             toggle_temp_units,
             cycle_default_display,
             toggle_gauge_display_mode,
+            toggle_read_parameter,
+            finalize_read_parameters_update,
         )
+
+        selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
+        selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
+        selected_stream_labels = [read_parameter_label(code) for code in selected_stream_codes]
+        selected_digital_registers = get_selected_digital_registers(selected_read_parameters)
+
+        with state.acquire_lock():
+            state.stream_display_codes = list(selected_stream_codes)
+            state.stream_display_labels = list(selected_stream_labels)
 
         # Refresh digital register values for digital bit pages.
         if DEMO_MODE:
@@ -793,95 +936,116 @@ try:
             current_mode = state.current_mode
             display_index = state.display_index
             showing_peak = state.showing_peak
+
+        if current_mode == DISPLAY_MODE and selected_stream_codes:
+            if display_index not in range(len(selected_stream_codes)):
+                with state.acquire_lock():
+                    state.display_index = 0
+                    display_index = state.display_index
+
+        if current_mode == DIGITAL_BITS_MODE and selected_digital_registers:
+            with state.acquire_lock():
+                if state.digital_page_index >= len(selected_digital_registers):
+                    state.digital_page_index %= len(selected_digital_registers)
         
         # Update sensor data if in DISPLAY_MODE
         if current_mode == DISPLAY_MODE and not showing_peak and (DEMO_MODE or R is not None):
-            if DEMO_MODE:
-                elapsed = time.monotonic() - demo_start_time
-                display_values = get_demo_values(elapsed)
-                display_values = apply_active_test_effects_to_demo_values(display_values, state, temp_unit_label)
-                with state.acquire_lock():
-                    speed_correction = state.speed_correction
-                display_values[1] = float(display_values[1] * speed_correction)
-                state.update_display_values(np.array(display_values))
-                rpm_value = float(display_values[0])
-                temp_value = float(display_values[4])
-            else:
-                reader = R
-                if reader is None:
-                    time.sleep(0.05)
-                    continue
-                with state.acquire_lock():
-                    speed_correction = state.speed_correction
-                display_values = np.array([
-                    int(reader.RPM_Value),
-                    float(reader.SPEED_Value) * speed_correction,
-                    reader.MAF_Value,
-                    reader.AAC_Value,
-                    int(reader.TEMP_Value),
-                    reader.BATT_Value,
-                    reader.INJ_Value,
-                    int(reader.TIM_Value),
-                    reader.TPS_Value,
-                ])
-                state.update_display_values(display_values)
-                rpm_value = float(reader.RPM_Value)
-                temp_value = float(reader.TEMP_Value)
-
-            with state.acquire_lock():
-                current_display_index = state.display_index
-                current_display_value = float(state.display_values[current_display_index])
-
-            current_display_value = format_metric_value(current_display_index, current_display_value)
-            current_display_text = format_metric_text(current_display_index, current_display_value)
-            
-            current_title = DisplayText[current_display_index]
-            current_unit = Units[current_display_index]
-            minimum, maximum = get_metric_range(current_display_index)
-            now = time.monotonic()
-
-            with state.acquire_lock():
-                rpm_warning = state.rpm_warning
-                coolant_warning = state.coolant_warning
-                units_temp = state.units_temp
-                gauge_display_mode = str(state.gauge_display_mode)
-
-            warning_lines: list[str] = []
-            if temp_value > coolant_warning:
-                warning_lines.append("OVERHEAT!")
-            if rpm_value > rpm_warning:
-                warning_lines.append("REV LIMIT!")
-
-            warning_overlay_text = "\n".join(warning_lines)
-
-            render_interval = 1.0 / DISPLAY_TARGET_FPS
-            needs_render = (
-                current_display_index != state.last_display_index
-                or current_unit != state.last_display_unit
-                or abs(current_display_value - state.last_display_value) >= DISPLAY_MIN_DELTA
-                or warning_overlay_text != state.last_warning_overlay_text
-                or (now - state.last_display_render_time) >= render_interval
-            )
-
-            if needs_render:
-                show_dial = gauge_display_mode != "Value Only"
+            if not selected_stream_codes:
                 show_gauge(
-                    current_title,
-                    current_display_value,
-                    current_unit,
-                    minimum,
-                    maximum,
-                    show_needle=show_dial,
-                    show_dial=show_dial,
-                    value_text=current_display_text,
-                    warning_lines=warning_lines,
+                    "Data Stream",
+                    0.0,
+                    "",
+                    0.0,
+                    1.0,
+                    show_needle=False,
+                    show_dial=False,
+                    value_text="No Read Parameters Selected",
                 )
+            else:
+                if DEMO_MODE:
+                    elapsed = time.monotonic() - demo_start_time
+                    demo_value_map = build_demo_stream_value_map(elapsed)
+                    with state.acquire_lock():
+                        speed_correction = state.speed_correction
+                    current_value_map = {
+                        code: get_stream_value_for_code(code, None, demo_value_map, speed_correction)
+                        for code in selected_stream_codes
+                    }
+                    rpm_value = float(current_value_map.get(0x01, 0.0))
+                    temp_value = float(current_value_map.get(0x08, 0.0))
+                else:
+                    reader = R
+                    if reader is None:
+                        time.sleep(0.05)
+                        continue
+                    with state.acquire_lock():
+                        speed_correction = state.speed_correction
+                    current_value_map = {
+                        code: get_stream_value_for_code(code, reader, {}, speed_correction)
+                        for code in selected_stream_codes
+                    }
+                    rpm_value = float(current_value_map.get(0x01, 0.0))
+                    temp_value = float(current_value_map.get(0x08, 0.0))
+
+                state.update_stream_peaks(current_value_map)
+
                 with state.acquire_lock():
-                    state.last_display_render_time = now
-                    state.last_display_index = current_display_index
-                    state.last_display_value = current_display_value
-                    state.last_display_unit = current_unit
-                    state.last_warning_overlay_text = warning_overlay_text
+                    state.stream_display_values = dict(current_value_map)
+                    current_display_index = state.display_index
+                    if current_display_index >= len(selected_stream_codes):
+                        current_display_index = 0
+                        state.display_index = 0
+                    current_display_code = selected_stream_codes[current_display_index]
+                    current_display_value = float(current_value_map.get(current_display_code, 0.0))
+
+                current_title = read_parameter_title(current_display_code)
+                current_unit = get_stream_unit(current_display_code, Units_Speed, Units_Temp)
+                minimum, maximum = get_stream_range(current_display_code, Units_Speed, Units_Temp)
+                current_display_text = format_stream_value_text(current_display_code, current_display_value, current_unit)
+                now = time.monotonic()
+
+                with state.acquire_lock():
+                    rpm_warning = state.rpm_warning
+                    coolant_warning = state.coolant_warning
+                    gauge_display_mode = str(state.gauge_display_mode)
+
+                warning_lines: list[str] = []
+                if rpm_value > rpm_warning:
+                    warning_lines.append("REV LIMIT!")
+                if temp_value > coolant_warning:
+                    warning_lines.append("OVERHEAT!")
+
+                warning_overlay_text = "\n".join(warning_lines)
+
+                render_interval = 1.0 / DISPLAY_TARGET_FPS
+                needs_render = (
+                    current_display_code != getattr(state, "last_display_code", None)
+                    or current_unit != state.last_display_unit
+                    or abs(current_display_value - state.last_display_value) >= DISPLAY_MIN_DELTA
+                    or warning_overlay_text != state.last_warning_overlay_text
+                    or (now - state.last_display_render_time) >= render_interval
+                )
+
+                if needs_render:
+                    show_dial = gauge_display_mode != "Value Only"
+                    show_gauge(
+                        current_title,
+                        current_display_value,
+                        current_unit,
+                        minimum,
+                        maximum,
+                        show_needle=show_dial,
+                        show_dial=show_dial,
+                        value_text=current_display_text,
+                        warning_lines=warning_lines,
+                    )
+                    with state.acquire_lock():
+                        state.last_display_render_time = now
+                        state.last_display_index = current_display_index
+                        state.last_display_code = current_display_code
+                        state.last_display_value = current_display_value
+                        state.last_display_unit = current_unit
+                        state.last_warning_overlay_text = warning_overlay_text
 
         elif current_mode == DTC_MODE:
             show_dtc_screen(state, show_gauge, DTC_CODE_TITLES)
@@ -893,10 +1057,10 @@ try:
             show_active_test_screen(state, gauge, show_gauge, temp_unit_label)
 
         elif current_mode == DIGITAL_BITS_MODE:
-            show_digital_bits_screen(state, gauge)
+            show_digital_bits_screen(state, gauge, selected_digital_registers)
 
         elif current_mode == MODE_MENU:
-            show_mode_menu_screen()
+            show_mode_menu_screen(bool(selected_stream_codes), bool(selected_digital_registers))
 
         if not pump_local_ui_events():
             read_thread_active = False

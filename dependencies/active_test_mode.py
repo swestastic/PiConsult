@@ -1,4 +1,6 @@
 import time
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 import serial
@@ -21,6 +23,20 @@ ACTIVE_TEST_IAAC = 3
 ACTIVE_TEST_POWER_BALANCE = 4
 ACTIVE_TEST_FUEL_PUMP = 5
 ACTIVE_TEST_CLEAR_SELF_LEARN = 6
+
+
+@lru_cache(maxsize=1)
+def _list_body_font() -> ImageFont.ImageFont:
+    font_dir = Path(__file__).resolve().parent / "Font"
+    for font_name in ("Font02.ttf", "Font01.ttf", "Font00.ttf"):
+        font_path = font_dir / font_name
+        if not font_path.exists():
+            continue
+        try:
+            return ImageFont.truetype(str(font_path), 18)
+        except Exception:
+            continue
+    return ImageFont.load_default()
 
 
 def _clamp_int(value: int, minimum: int, maximum: int) -> int:
@@ -207,19 +223,26 @@ def show_power_balance_menu_screen(gauge: Any, editing: bool, cursor_selection: 
     title_width, _ = gauge._text_size(draw, title, gauge.label_font)
     draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
 
-    body_font = ImageFont.load_default()
+    body_font = _list_body_font()
     rows = [("Exit", 0)] + [(f"Cylinder {idx}", idx) for idx in range(1, 9)]
     start_y = 36
     bottom_margin = 18
-    row_height = max(13, (height - start_y - bottom_margin) // len(rows))
+    max_visible_rows = 5
+    total_rows = len(rows)
+    visible_rows = min(max_visible_rows, total_rows)
+    row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
+    cursor_selection = _clamp_int(cursor_selection, 0, max(total_rows - 1, 0))
+    visible_start = max(0, min(cursor_selection - (visible_rows // 2), max(total_rows - visible_rows, 0)))
+    visible_end = min(total_rows, visible_start + visible_rows)
 
-    for row_index, (label, value) in enumerate(rows):
-        y = start_y + (row_index * row_height)
+    for visible_row, row_index in enumerate(range(visible_start, visible_end)):
+        label, value = rows[row_index]
+        y = start_y + (visible_row * row_height)
         is_selected = value == cursor_selection
         is_off = value in selected_cylinders_off and value != 0
 
         if is_selected:
-            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
 
         pointer = ">" if is_selected else " "
         marker = "X" if is_off else " "
@@ -228,7 +251,7 @@ def show_power_balance_menu_screen(gauge: Any, editing: bool, cursor_selection: 
         draw.text((8, y + 2), line, font=body_font, fill=text_color)
 
     footer = "Select: Toggle/Exit  Up/Down: Choose" if editing else "Select to edit"
-    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+    draw.text((8, height - 20), footer, font=body_font, fill=(180, 180, 180))
 
     if gauge.rotation_degrees:
         image = image.rotate(gauge.rotation_degrees)
@@ -283,16 +306,22 @@ def show_active_test_list_screen(
     title_width, _ = gauge._text_size(draw, title, gauge.label_font)
     draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
 
-    body_font = ImageFont.load_default()
+    body_font = _list_body_font()
     start_y = 36
     bottom_margin = 18
-    row_height = max(13, (height - start_y - bottom_margin) // len(ACTIVE_TEST_ITEMS))
+    max_visible_rows = 5
+    total_rows = len(ACTIVE_TEST_ITEMS)
+    visible_rows = min(max_visible_rows, total_rows)
+    row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
+    visible_start = max(0, min(selected_index - (visible_rows // 2), max(total_rows - visible_rows, 0)))
+    visible_end = min(total_rows, visible_start + visible_rows)
 
     with state.acquire_lock():
         editing = state.active_test_editing
 
-    for row_index, label in enumerate(ACTIVE_TEST_ITEMS):
-        y = start_y + (row_index * row_height)
+    for visible_row, row_index in enumerate(range(visible_start, visible_end)):
+        label = ACTIVE_TEST_ITEMS[row_index]
+        y = start_y + (visible_row * row_height)
         is_selected = row_index == selected_index
         is_editable = row_index in {
             ACTIVE_TEST_COOLANT,
@@ -303,7 +332,7 @@ def show_active_test_list_screen(
         }
 
         if is_selected:
-            draw.rectangle((4, y, width - 4, y + row_height - 2), fill=(24, 36, 52), outline=(90, 140, 190))
+            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
 
         pointer = ">" if is_selected else " "
         value_text = _active_test_value_text(state, row_index, temp_unit_label)
@@ -313,7 +342,7 @@ def show_active_test_list_screen(
         draw.text((8, y + 2), line, font=body_font, fill=text_color)
 
     footer = "Up/Down: Adjust  Select: Save" if editing else "Up/Down: Navigate  Select: Edit"
-    draw.text((8, height - 14), footer, font=body_font, fill=(180, 180, 180))
+    draw.text((8, height - 20), footer, font=body_font, fill=(180, 180, 180))
 
     if gauge.rotation_degrees:
         image = image.rotate(gauge.rotation_degrees)

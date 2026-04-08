@@ -76,10 +76,21 @@ View binary values in the ECU that tell you when solenoids or other switches are
 - IACV/FICD Solenoid
 - Park/Neutral Switch
 
-## In Testing
+## Bugs/Issues
+
+- Add auto reconnect
+- Clean up active tests 
+- Modes for adjusting TPS (display throttle closed + tps voltage on same screen) and for timing/idle lockout
+- Low framerate on Pi with gauge display
+- Fix screen centering in STL files
+
+## Coming soon or eventually
 
 - More active test options
 - Display items based on ECU P/N (i.e. only display Power Balance cylinder 1-4 for 4-cylinder engines, display both left and right bank O2 sensors for V6 or V8, etc.)
+- Multiple readouts on the same page
+- A/C computer support?
+- Auto read COM port if using laptop
 
 ## Prerequisites
 

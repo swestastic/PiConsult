@@ -6,28 +6,28 @@ from PIL import Image, ImageDraw, ImageFont
 DIGITAL_REGISTER_ORDER = [0x13, 0x1E, 0x1F, 0x21]
 DIGITAL_BIT_NAME_MAP: dict[int, dict[int, str]] = {
     0x13: {
-        0: "Start Signal",
-        1: "Closed Throttle",
-        2: "Coolant Fan Hi",
-        3: "Coolant Fan Lo",
-        4: "EGR Solenoid",
+        4: "A/C On Switch",
+        3: "Power Steering Switch",
+        2: "Park/Neutral Switch",
+        1: "Start Signal",
+        0: "TPS Closed",
     },
     0x1E: {
-        7: "A/C On Switch",
-        6: "Aircon Relay",
-    },
-    0x1F: {
-        7: "LH Bank Lean",
+        7: "Aircon Relay",
         6: "Fuel Pump Relay",
         5: "VTC Solenoid",
-        4: "P/Reg Control",
-        3: "Wastegate Sol",
-        2: "RH Bank Lean",
+        1: "Coolant Fan Hi",
+        0: "Coolant Fan Lo",
+    },
+    0x1F: {
+        6: "P/Reg Control Valve",
+        5: "Wastegate Sol",
+        3: "IACV/FICD Sol",
+        0: "EGR Solenoid",
     },
     0x21: {
-        7: "Power Steering",
-        6: "IACV/FICD Sol",
-        5: "Park/Neutral",
+        7: "LH-BANK Lean",
+        6: "RH-BANK Lean",
     },
 }
 
@@ -72,41 +72,40 @@ def update_digital_registers_from_demo(state: Any, elapsed_seconds: float) -> No
     reg1f = 0
     reg21 = 0
 
-    if np.sin(elapsed_seconds * 1.4) > 0.75:
-        reg13 |= (1 << 0)
-    if np.sin(elapsed_seconds * 0.9) < -0.35:
-        reg13 |= (1 << 1)
-    if np.sin(elapsed_seconds * 0.4) > 0.15:
-        reg13 |= (1 << 2)
-    if np.sin(elapsed_seconds * 0.35 + 0.8) > 0.35:
-        reg13 |= (1 << 3)
     if np.sin(elapsed_seconds * 0.55) > 0.55:
-        reg13 |= (1 << 4)
+        reg13 |= (1 << 4)  # A/C On Switch
+    if np.sin(elapsed_seconds * 0.8 + 1.6) > 0.35:
+        reg13 |= (1 << 3)  # Power Steering Switch
+    if not power_balance:
+        reg13 |= (1 << 2)  # Park/Neutral Switch
+    if np.sin(elapsed_seconds * 1.4) > 0.75:
+        reg13 |= (1 << 1)  # Start Signal
+    if np.sin(elapsed_seconds * 0.9) < -0.35:
+        reg13 |= (1 << 0)  # TPS Closed
 
-    if np.sin(elapsed_seconds * 0.3 + 1.2) > 0.0:
-        reg1e |= (1 << 7)
     if np.sin(elapsed_seconds * 0.3 + 0.4) > 0.1:
+        reg1e |= (1 << 7)
+    if fuel_pump_off:
         reg1e |= (1 << 6)
+    if np.sin(elapsed_seconds * 0.85 + 0.2) > 0.3:
+        reg1e |= (1 << 5)
+    if np.sin(elapsed_seconds * 0.4) > 0.15:
+        reg1e |= (1 << 1)
+    if np.sin(elapsed_seconds * 0.35 + 0.8) > 0.35:
+        reg1e |= (1 << 0)
+
+    if np.sin(elapsed_seconds * 0.75 + 1.0) > 0.45:
+        reg1f |= (1 << 6)
+    if np.sin(elapsed_seconds * 1.05 + 2.1) > 0.6:
+        reg1f |= (1 << 5)
+        reg1f |= (1 << 3)
+    if np.sin(elapsed_seconds * 0.55) > 0.15:
+        reg1f |= (1 << 0)
 
     if np.sin(elapsed_seconds * 0.6) > 0.25:
-        reg1f |= (1 << 7)
-    if fuel_pump_off:
-        reg1f |= (1 << 6)
-    if np.sin(elapsed_seconds * 0.85 + 0.2) > 0.3:
-        reg1f |= (1 << 5)
-    if np.sin(elapsed_seconds * 0.75 + 1.0) > 0.45:
-        reg1f |= (1 << 4)
-    if np.sin(elapsed_seconds * 1.05 + 2.1) > 0.6:
-        reg1f |= (1 << 3)
-    if np.sin(elapsed_seconds * 0.7 + 2.5) < -0.4:
-        reg1f |= (1 << 2)
-
-    if np.sin(elapsed_seconds * 0.8 + 1.6) > 0.35:
         reg21 |= (1 << 7)
-    if np.sin(elapsed_seconds * 1.1 + 0.3) > 0.55:
+    if np.sin(elapsed_seconds * 0.7 + 2.5) < -0.4:
         reg21 |= (1 << 6)
-    if not power_balance:
-        reg21 |= (1 << 5)
 
     update_digital_register_values(state, reg13, reg1e, reg1f, reg21)
 
@@ -119,12 +118,36 @@ def update_digital_registers_from_reader(state: Any, reader: Any, parse_int_fn: 
     update_digital_register_values(state, reg13, reg1e, reg1f, reg21)
 
 
-def show_digital_bits_screen(state: Any, gauge: Any) -> None:
+def show_digital_bits_screen(state: Any, gauge: Any, selected_registers: list[int]) -> None:
     with state.acquire_lock():
-        page_index = state.digital_page_index % len(DIGITAL_REGISTER_ORDER)
         register_values = dict(state.digital_register_values)
 
-    register = DIGITAL_REGISTER_ORDER[page_index]
+    if not selected_registers:
+        width = gauge.disp.height
+        height = gauge.disp.width
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        title_font = gauge.label_font
+        body_font = ImageFont.load_default()
+
+        title = "Digital Registers"
+        title_width, _ = gauge._text_size(draw, title, title_font)
+        draw.text(((width - title_width) // 2, 6), title, font=title_font, fill=(255, 255, 255))
+
+        message = "No digital registers selected"
+        message_width, _ = gauge._text_size(draw, message, body_font)
+        draw.text(((width - message_width) // 2, height // 2), message, font=body_font, fill=(150, 150, 150))
+
+        if gauge.rotation_degrees:
+            image = image.rotate(gauge.rotation_degrees)
+
+        gauge.disp.ShowImage(image)
+        return
+
+    with state.acquire_lock():
+        page_index = state.digital_page_index % len(selected_registers)
+
+    register = selected_registers[page_index]
     register_value = register_values.get(register, 0)
 
     width = gauge.disp.height
@@ -134,7 +157,7 @@ def show_digital_bits_screen(state: Any, gauge: Any) -> None:
     title_font = gauge.label_font
     body_font = ImageFont.load_default()
 
-    title = f"Digital 0x{register:02X} {page_index + 1}/4"
+    title = f"Digital 0x{register:02X} {page_index + 1}/{len(selected_registers)}"
     title_width, _ = gauge._text_size(draw, title, title_font)
     title_x = (width - title_width) // 2
     draw.text((title_x, 6), title, font=title_font, fill=(255, 255, 255))
