@@ -127,7 +127,7 @@ View binary values in the ECU that tell you when solenoids or other switches are
 1. Set up your Pi with Raspbian or a similar OS (enabling SSH may be helpful for testing or debugging!)
 2. Clone the repo onto the Pi
 3. Install the required Python packages on the Pi: `pip install -r requirements.txt`
-4. Set ConsultStart.sh to run at boot [Reference Link](https://zt4ff.medium.com/running-scripts-on-boot-in-linux-using-systemd-e10d3606f28f)
+4. Set `ConsultStart.sh` to run at boot [Reference Link](https://zt4ff.medium.com/running-scripts-on-boot-in-linux-using-systemd-e10d3606f28f) Be sure to update `ConsultStart.sh` with the correct path based on where it's located in your filesystem!
 5. Make sure SPI/I2C is enabled in raspi-config [Reference Link](https://www.waveshare.com/wiki/1.9inch_LCD_Module)
 
 ## Physical Assembly
