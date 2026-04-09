@@ -6,21 +6,40 @@ This project uses Python to record data over serial on a Raspberry Pi and then d
 
 ## Current Functionality
 
+### Mode selection menu
+
+![mode select image](images/modeselect.gif)
+
+Allows selection of modes between Data Stream, DTC, Active Test, Digital Registers, and Settings. Use Up/Down to navigate and Select to choose an option.
+
 ### Mode 1: Data stream
 
 ![gauge image](images/gauge.gif)
 
 Reads the following data from the ECU and can display live data on the screen. Displayed value changes with button press of Up/Down. Press Select to see the peak value stored during this drive.
 
+The values displayed can be chosen in Settings → Read Parameters. Note that not all parameters are supported on all ECUs (Ex. RH MAF Voltage is only available on ECUs which support 2 MAF sensors, such as RB26DETT). For cars with only one O2 sensor or MAF, use the LH parameter. Up to 20 parameters can be read at once, although using only what is necessary may help performance.
+
+Supported parameters:
+
 - Engine RPM
-- Wheel speed
-- MAF voltage
-- AAC duty cycle percentage
-- Engine coolant temperature
-- Battery voltage
-- Injector timing
-- Ignition timing
-- Throttle Position
+- LH / RH MAF Voltage
+- Coolant Temperature
+- LH / RH O2 Voltage
+- Vehicle Speed
+- Battery Voltage
+- TPS Voltage (Throttle position)
+- Intake Air Temperature
+- Exhaust Gas Temperature
+- LH / RH Injection Time
+- Ignition Timing
+- AAC Duty Cycle
+- LH / RH Air Fuel Alpha
+- LH / RH Air Fuel Alpha Self Learn
+- Digital Register 0x13 (A/C switch, Power Steering, Neutral/Park, Start signal, closed TPS)
+- Digital Register 0x1E (A/C Relay, Fuel Pump Relay, VTC solenoid, Coolant Fan Hi, Coolant Fan Lo)
+- Digital Register 0x1F (P/Reg control, Wastegate Solenoid, IACV/FICD Solenoid, EGR Solenoid)
+- Digital Register 0x21 (LH Bank Lean, RH Bank Lean)
 
 ### Mode 2: DTCs
 
@@ -43,6 +62,8 @@ Settings adjustment mode with the following options:
 
 ### Mode 4: Active Test
 
+![active test image](images/activetest.gif)
+
 Active Testing mode with the following functions:
 
 - Manual selection of coolant temp
@@ -59,38 +80,37 @@ Active Testing mode with the following functions:
 
 View binary values in the ECU that tell you when solenoids or other switches are triggered
 
-- EGR Solenoid
-- Coolant Fan Low
-- Coolant Fan Hi
-- Closed Throttle
-- Start Signal
-- A/C Switch
-- A/C Relay
-- LH Bank Lean
-- RH Bank Lean
-- Fuel Pump Relay
-- VTC Solenoid
-- Wastegate Solenoid
-- P/Reg Control
-- Power Steering
-- IACV/FICD Solenoid
-- Park/Neutral Switch
+**0x13:** A/C switch, Power Steering, Neutral/Park, Start signal, closed TPS
 
-## Bugs/Issues
+**0x1E:** A/C Relay, Fuel Pump Relay, VTC solenoid, Coolant Fan Hi, Coolant Fan Lo
 
-- Add auto reconnect
-- Clean up active tests 
-- Modes for adjusting TPS (display throttle closed + tps voltage on same screen) and for timing/idle lockout
+**0x1F:** P/Reg control, Wastegate Solenoid, IACV/FICD Solenoid, EGR Solenoid
+
+**0x21:** LH Bank Lean, RH Bank Lean
+
+## Current Bugs/Issues/ToDos
+
+- Active tests not disabling cleanly
 - Low framerate on Pi with gauge display
 - Fix screen centering in STL files
+- Fix footer inconsistencies in some menus
+- There may be some bugs in the DTC reader, I've been getting inconsistent results.
+- Inconsistent Up/Down behavior (Up/Down buttons are switched on some menus)
+- `configJSON.json` Read Parameters are magic numbers, should be actual read parameters or registers
+- Text is cut off in some menu items, needs to be scrolling or wrapped
+- Crash logs don't seem to be working correctly
 
-## Coming soon or eventually
+## Future Features
 
 - More active test options
-- Display items based on ECU P/N (i.e. only display Power Balance cylinder 1-4 for 4-cylinder engines, display both left and right bank O2 sensors for V6 or V8, etc.)
+- Modes for adjusting TPS (display throttle closed + tps voltage on same screen) and for timing/idle lockout
+- Display items based on ECU P/N (i.e. only display Power Balance cylinder 1-4 for 4-cylinder engines, display both left and right bank O2 sensors for V6 or V8, etc. Additionally, some registers may be different for different ECUs, so that will need to be explored.)
 - Multiple readouts on the same page
-- A/C computer support?
+- A/C, HICAS, Airbag computer support (possibly)
 - Auto read COM port if using laptop
+- Auto reconnection
+- Data log saving
+- MPG Calculation
 
 ## Prerequisites
 
@@ -105,12 +125,12 @@ View binary values in the ECU that tell you when solenoids or other switches are
 ## Software Installation
 
 1. Set up your Pi with Raspbian or a similar OS (enabling SSH may be helpful for testing or debugging!)
-2. Grab the latest release from [Releases](github.com/swestastic/PiConsult/releases)
+2. Clone the repo onto the Pi
 3. Install the required Python packages on the Pi: `pip install -r requirements.txt`
-4. Set ConsultStart.sh to run at boot (I used systemd method)
-5. It is recommended to look into optimizing boot times on the Pi for a better user experience. Do your own research on this.
+4. Set ConsultStart.sh to run at boot [Reference Link](https://zt4ff.medium.com/running-scripts-on-boot-in-linux-using-systemd-e10d3606f28f)
+5. Make sure SPI/I2C is enabled in raspi-config [Reference Link](https://www.waveshare.com/wiki/1.9inch_LCD_Module)
 
-## Assembly and Installation
+## Physical Assembly
 
 First connect all of your wires according to the following pinout:
 
@@ -124,7 +144,15 @@ Place the OLED screen inside of the sandwich plate and connect the wires on the 
 
 **Missing Photo**
 
-Place the 4x buttons in the supplied slots and connect the wires on the back
+Place the 4x buttons in the supplied slots and connect the wires on the back. Each button should have 1 pin connected to ground, and then the other pins are wired as follows:
+
+Mode → GPIO 26
+
+Select → GPIO 16
+
+Up → GPIO 23
+
+Down → GPIO 17
 
 **Missing Photo**
 
@@ -144,13 +172,6 @@ Turn on the car and you should be ready to go! Make sure to configure settings a
 
 **Missing Photo**
 
-## Usage
-
-1. Connect the SPI display to the Raspberry Pi and ensure that SPI/I2C are enabled in settings.
-2. Run the Python script: `python3 Main.py`. Alternatively run `./ConsultStart.sh` in terminal. Make sure to give ConsultStart.sh executable permission with `chmod +x ConsultStart.sh`
-3. The script will start recording data over serial and display it on the SPI display.
-4. You can set up SSH to connect to the device once it is on your network. The default address is `kylec@consult.local`.
-
 ## Local Desktop Mode (Laptop/Windows/macOS/Linux)
 
 You can run the project without a Raspberry Pi display. A popup window is used as a virtual LCD, and on-screen Mode/Select/Up/Down buttons drive the same app logic. This is largely just used for testing, but you could use it functionally as well.
@@ -164,11 +185,18 @@ Notes:
 
 - Desktop mode is selected automatically when Pi hardware dependencies are unavailable.
 - On Raspberry Pi, hardware display and GPIO behavior remain the default unless `CONSULT_LOCAL_UI=1` is set.
+- No functionality is built in yet for changing COM port. In the `PortConnect` function in `main.py` you can manually specify a com port. If using the Raspberry Pi USB port, then you can use this line `return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)`, alternatively for Windows I comment that line out and instead use `return serial.Serial("COM6", 9600, timeout=None)` (Note that "COM6" will probably be a different port on your machine, use Device Manager to check)
 
 ## Configuration
 
 - `Dependencies/config.py` contains hardware configuration for GPIO/SPI/I2C interfaces.
 - `Dependencies/configJSON.json` contains runtime settings and defaults.
+
+## Contributing
+
+I am actively looking for other contributors to help keep this project going! Ultimately this is something that I made for personal use, but decided to publish since I think the community could benefit from it. To keep long term support, add features, and improve the project all around I will need additional help :). Feel free to open issues, fork the repo, and open pull requests for bug fixes, additional features, etc.
+
+The local UI is there for testing, although updates should be tested on Pi hardware as well before they're merged. You can message me `Discord: @swestastic` as well for any clarifications or questions on how things are set up.
 
 ## Acknowledgements
 

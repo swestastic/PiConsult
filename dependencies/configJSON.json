@@ -1,1 +1,1 @@
-{"Units_Speed": "MPH", "Units_Temp": "F", "Speed_Correction": 1.0, "Default_Display": 4, "Injector_Size": 270, "Coolant_Warning": 190, "RPM_Warning": 6700, "Log_Index": 32, "Gauge_Display_Mode": "Gauge + Value", "Read_Parameters": [13, 12, 8, 11, 19, 30, 31, 33, 5]}
+{"Units_Speed": "MPH", "Units_Temp": "F", "Speed_Correction": 1.0, "Default_Display": 5, "Injector_Size": 270, "Coolant_Warning": 190, "RPM_Warning": 6700, "Log_Index": 0, "Gauge_Display_Mode": "Gauge + Value", "Read_Parameters": [13, 12, 8, 11, 19, 30, 31, 33, 5, 1]}
