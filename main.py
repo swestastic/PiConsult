@@ -60,6 +60,7 @@ from dependencies.config import (
     UP_BUTTON_PIN,
     DOWN_BUTTON_PIN,
     BUTTON_HOLD_TIME_SECONDS,
+    BUTTON_BOUNCE_TIME_SECONDS,
 )
 
 try:
@@ -202,10 +203,10 @@ DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30")
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
 
 # Buttons
-ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
-SelectButton = Button(SELECT_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
-UpButton = Button(UP_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
-DownButton = Button(DOWN_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
+ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=BUTTON_BOUNCE_TIME_SECONDS)
+SelectButton = Button(SELECT_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=BUTTON_BOUNCE_TIME_SECONDS)
+UpButton = Button(UP_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=BUTTON_BOUNCE_TIME_SECONDS)
+DownButton = Button(DOWN_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=BUTTON_BOUNCE_TIME_SECONDS)
 
 # Mode constants
 DISPLAY_MODE = 0
