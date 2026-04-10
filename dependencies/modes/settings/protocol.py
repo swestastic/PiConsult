@@ -51,7 +51,8 @@ def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -
         os.makedirs(parent_dir, exist_ok=True)
     try:
         with open(resolved_file, "w", encoding="utf-8") as file:
-            json.dump(settings, file)
+            json.dump(settings, file, indent=4)
+            file.write("\n")
         return
     except OSError:
         fallback_file = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.basename(resolved_file)))
@@ -61,7 +62,8 @@ def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -
         if fallback_parent:
             os.makedirs(fallback_parent, exist_ok=True)
         with open(fallback_file, "w", encoding="utf-8") as file:
-            json.dump(settings, file)
+            json.dump(settings, file, indent=4)
+            file.write("\n")
 
 
 def update_units(
