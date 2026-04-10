@@ -27,8 +27,6 @@
 # THE SOFTWARE.
 #
 
-import os
-import sys
 import time
 import spidev
 import logging
@@ -77,7 +75,20 @@ class RaspberryPi:
         return PWMOutputDevice(Pin,frequency = self.BL_freq)
 
     def spi_writebyte(self, data):
-        if self.SPI!=None :
+        if self.SPI is None:
+            return
+
+        writebytes2 = getattr(self.SPI, "writebytes2", None)
+        if callable(writebytes2):
+            try:
+                writebytes2(data)
+                return
+            except Exception:
+                pass
+
+        if isinstance(data, (bytes, bytearray, memoryview)):
+            self.SPI.writebytes(list(data))
+        else:
             self.SPI.writebytes(data)
 
     def bl_DutyCycle(self, duty):

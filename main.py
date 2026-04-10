@@ -3,31 +3,20 @@ import argparse
 import time
 import serial
 import threading
-from functools import lru_cache
-from pathlib import Path
 from typing import Optional, Any
-from PIL import Image, ImageDraw, ImageFont
 
-from dependencies.Buttons import process_buttons as process_button_events, setup_button_callbacks
-from dependencies.dtc_dict import dtc_codes as DTC_CODE_TITLES
-from dependencies.settings import Load_Config, Save_Config
-from dependencies.read import ReadStream, get_stream_value_for_code
+from dependencies.hardware.buttons import process_buttons as process_button_events, setup_button_callbacks
+from dependencies.modes.settings import Load_Config, Save_Config
+from dependencies.modes.data_stream import ReadStream, get_stream_value_for_code
 from dependencies.logs import Create_Log_File, WriteLog
 from dependencies.local_ui import LocalButton, local_ui_requested
-from dependencies.active_test_mode import (
+from dependencies.modes.active_test import (
     ACTIVE_TEST_ITEMS,
-    ACTIVE_TEST_COOLANT,
-    ACTIVE_TEST_FUEL_INJ,
-    ACTIVE_TEST_TIMING,
-    ACTIVE_TEST_IAAC,
-    ACTIVE_TEST_POWER_BALANCE,
-    ACTIVE_TEST_FUEL_PUMP,
-    ACTIVE_TEST_CLEAR_SELF_LEARN,
     adjust_active_test_value,
     run_active_test_action,
     show_active_test_screen,
 )
-from dependencies.consult_registers import (
+from dependencies.consult.registers import (
     DEFAULT_READ_PARAMETERS,
     READ_PARAMETER_OPTIONS,
     get_selected_digital_registers,
@@ -36,7 +25,7 @@ from dependencies.consult_registers import (
     read_parameter_label,
     read_parameter_title,
 )
-from dependencies.settings_mode import (
+from dependencies.modes.settings import (
     build_adjust_setting_value_fn,
     build_apply_settings_to_runtime_fn,
     build_cycle_default_display_fn,
@@ -49,17 +38,18 @@ from dependencies.settings_mode import (
     build_toggle_speed_units_fn,
     build_toggle_temp_units_fn,
 )
-from dependencies.consult_protocol import (
-    build_clear_dtc_codes_fn,
-    build_read_dtc_codes_fn,
+from dependencies.consult.protocol import (
     send_activation_command as protocol_send_activation_command,
 )
-from dependencies.digital_mode import (
+from dependencies.modes.digital_register import (
     show_digital_bits_screen,
     update_digital_registers_from_demo,
     update_digital_registers_from_reader,
 )
-from dependencies.dtc_mode import (
+from dependencies.modes.dtc import (
+    DTC_CODE_TITLES,
+    build_clear_dtc_codes_fn,
+    build_read_dtc_codes_fn,
     refresh_dtc_codes_for_buttons,
     show_dtc_screen,
 )
@@ -77,7 +67,9 @@ try:
 except Exception:
     GpioButton = None
 
-from dependencies.gauge import GaugeNeedleDisplay, get_stream_range, show_gauge as render_gauge
+from dependencies.modes.data_stream import GaugeNeedleDisplay, get_stream_range, show_gauge as render_gauge
+from dependencies.common.ui import draw_scrollable_menu_screen
+from dependencies.common.helpers import speed_unit_label, temp_unit_label
 
 
 def parse_args() -> argparse.Namespace:
@@ -113,18 +105,6 @@ def parse_int(value: object, default: int = 0) -> int:
         return default
 
 
-def speed_unit_label(units_speed: object) -> str:
-    if units_speed in (1, "1", "MPH", "mph"):
-        return "MPH"
-    return "KPH"
-
-
-def temp_unit_label(units_temp: object) -> str:
-    if units_temp in (1, "1", "F", "f"):
-        return "F"
-    return "C"
-
-
 def format_stream_value_text(code: int, value: float, unit: str) -> str:
     if unit == "raw":
         return f"{int(round(value))}"
@@ -152,7 +132,7 @@ def WriteText(upper: object, lower: object) -> None:
 
 
 # Load configs
-CONF = os.path.join(os.path.dirname(__file__), "dependencies", "configJSON.json")
+CONF = os.path.join(os.path.dirname(__file__), "dependencies", "config", "configJSON.json")
 Settings = Load_Config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
 Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
@@ -222,10 +202,10 @@ DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30")
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
 
 # Buttons
-ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
-SelectButton = Button(SELECT_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
-UpButton = Button(UP_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
-DownButton = Button(DOWN_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
+ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
+SelectButton = Button(SELECT_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
+UpButton = Button(UP_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
+DownButton = Button(DOWN_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=0.08)
 
 # Mode constants
 DISPLAY_MODE = 0
@@ -377,7 +357,9 @@ class AppState:
         self.last_display_index = -1
         self.last_display_code = -1
         self.last_display_value = 0.0
+        self.last_display_text = ""
         self.last_display_unit = ""
+        self.last_display_needle_bucket = -1
         self.last_warning_render_time = 0.0
         self.last_warning_overlay_text = ""
         
@@ -557,69 +539,24 @@ def Show_Peak(idx: int) -> None:
         state.showing_peak = False
 
 
-@lru_cache(maxsize=1)
-def _list_body_font() -> Any:
-    font_dir = Path(__file__).resolve().parent / "dependencies" / "Font"
-    for font_name in ("Font02.ttf", "Font01.ttf", "Font00.ttf"):
-        font_path = font_dir / font_name
-        if not font_path.exists():
-            continue
-        try:
-            return ImageFont.truetype(str(font_path), 18)
-        except Exception:
-            continue
-    return ImageFont.load_default()
-
-
 def show_mode_menu_screen(display_mode_enabled: bool, digital_mode_enabled: bool) -> None:
     with state.acquire_lock():
         mode_menu_index = state.mode_menu_index
 
-    width = gauge.disp.height
-    height = gauge.disp.width
-    image = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-
-    title = "Select Mode"
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
-
-    body_font = _list_body_font()
-    start_y = 36
-    bottom_margin = 18
-    max_visible_rows = 5
-    total_rows = len(MODE_MENU_ITEMS)
-    visible_rows = min(max_visible_rows, total_rows)
-    row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
-    visible_start = max(0, min(mode_menu_index - (visible_rows // 2), max(total_rows - visible_rows, 0)))
-    visible_end = min(total_rows, visible_start + visible_rows)
-
     mode_enabled = [display_mode_enabled, True, True, digital_mode_enabled, True]
 
-    for visible_row, idx in enumerate(range(visible_start, visible_end)):
-        label = MODE_MENU_ITEMS[idx]
-        y = start_y + (visible_row * row_height)
-        is_selected = idx == mode_menu_index
+    def _line_builder(label: str, idx: int, is_selected: bool) -> tuple[str, tuple[int, int, int]]:
         is_enabled = mode_enabled[idx]
-
-        if is_selected:
-            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
-
         pointer = ">" if is_selected else " "
         line = f"{pointer} {label}"
         if is_enabled:
             text_color = (240, 240, 240) if is_selected else (165, 165, 165)
         else:
             text_color = (120, 120, 120)
-        draw.text((8, y + 2), line, font=body_font, fill=text_color)
+        return line, text_color
 
     footer = "Up/Down: Navigate  Select: Open"
-    draw.text((8, height - 20), footer, font=body_font, fill=(180, 180, 180))
-
-    if gauge.rotation_degrees:
-        image = image.rotate(gauge.rotation_degrees)
-
-    gauge.disp.ShowImage(image)
+    draw_scrollable_menu_screen(gauge, "Select Mode", MODE_MENU_ITEMS, mode_menu_index, _line_builder, footer)
 
 
 def send_activation_command(
@@ -648,7 +585,7 @@ def pump_local_ui_events() -> bool:
     return True
 
 
-def PortConnect(port_obj: object) -> Optional[serial.Serial]:
+def PortConnect() -> Optional[serial.Serial]:
     WriteText("Connecting...", "Serial")
     try:
         return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)
@@ -700,7 +637,7 @@ if DEMO_MODE:
 else:
     # Connect serial and ECU
     while PORT is None:
-        PORT = PortConnect(PORT)
+        PORT = PortConnect()
         time.sleep(0.1)
 
     ECU_Connected = ECU_Connect(PORT) if PORT is not None else False
@@ -865,13 +802,14 @@ try:
 
                 warning_overlay_text = "\n".join(warning_lines)
 
-                render_interval = 1.0 / DISPLAY_TARGET_FPS
+                needle_bucket = int(round(gauge.value_to_angle(current_display_value) * 2.0)) if gauge_display_mode != "Value Only" else -1
                 needs_render = (
                     current_display_code != getattr(state, "last_display_code", None)
                     or current_unit != state.last_display_unit
+                    or current_display_text != state.last_display_text
                     or abs(current_display_value - state.last_display_value) >= DISPLAY_MIN_DELTA
+                    or needle_bucket != state.last_display_needle_bucket
                     or warning_overlay_text != state.last_warning_overlay_text
-                    or (now - state.last_display_render_time) >= render_interval
                 )
 
                 if needs_render:
@@ -892,7 +830,9 @@ try:
                         state.last_display_index = current_display_index
                         state.last_display_code = current_display_code
                         state.last_display_value = current_display_value
+                        state.last_display_text = current_display_text
                         state.last_display_unit = current_unit
+                        state.last_display_needle_bucket = needle_bucket
                         state.last_warning_overlay_text = warning_overlay_text
 
         elif current_mode == DTC_MODE:

@@ -1,46 +1,67 @@
-from functools import lru_cache, partial
-from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from __future__ import annotations
 
-import serial
-from PIL import Image, ImageDraw, ImageFont
+import json
+import os
+from functools import partial
+from typing import Any, Callable
 
-from dependencies.consult_registers import (
+from dependencies.common.helpers import speed_unit_label
+from dependencies.consult.registers import (
     DEFAULT_READ_PARAMETERS,
     MAX_READ_PARAMETERS,
     READ_PARAMETER_OPTIONS,
     get_selected_stream_codes,
     normalize_read_parameters,
-    read_parameter_label,
     read_parameter_summary,
     read_parameter_title,
 )
 
-APP_VERSION = "V1.0.0"
-INFO_LINES = [
-    "PiConsult by Swestastic",
-    f"Software Version: {APP_VERSION}",
-    "",
-    "This is free software.",
-    "You are free to use, modify, and share it.",
-    "See the project README for details.",
-    "",
-    "github.com/swestastic/PiConsult",
-]
+
+def _resolve_config_path(file_path: str | os.PathLike[str] | None) -> str:
+    raw_path = os.fspath(file_path) if file_path is not None else ""
+    raw_path = raw_path.strip().strip('"').strip("'")
+    expanded_path = os.path.expanduser(raw_path)
+    return os.path.abspath(os.path.normpath(expanded_path))
 
 
-@lru_cache(maxsize=1)
-def _list_body_font() -> Any:
-    font_dir = Path(__file__).resolve().parent / "Font"
-    for font_name in ("Font02.ttf", "Font01.ttf", "Font00.ttf"):
-        font_path = font_dir / font_name
-        if not font_path.exists():
-            continue
-        try:
-            return ImageFont.truetype(str(font_path), 18)
-        except Exception:
-            continue
-    return ImageFont.load_default()
+def Load_Config(FILE: str | os.PathLike[str] | None) -> dict[str, Any]:
+    resolved_file = _resolve_config_path(FILE)
+    try:
+        with open(resolved_file, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        print("Config file not found, using default settings")
+        return {
+            "Units_Speed": "MPH",
+            "Units_Temp": "F",
+            "Speed_Correction": 1.0,
+            "Gauge_Display_Mode": "Gauge + Value",
+            "Default_Display": 0,
+            "Coolant_Warning": 200,
+            "RPM_Warning": 7000,
+            "Read_Parameters": [0x0B, 0x01, 0x08, 0x0C, 0x0D, 0x05, 0x09, 0x13, 0x16, 0x17, 0x1A, 0x1C, 0x1E, 0x1F, 0x21],
+            "Log_Index": 0,
+        }
+
+
+def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -> None:
+    resolved_file = _resolve_config_path(FILE)
+    parent_dir = os.path.dirname(resolved_file)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+    try:
+        with open(resolved_file, "w", encoding="utf-8") as file:
+            json.dump(settings, file)
+        return
+    except OSError:
+        fallback_file = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.basename(resolved_file)))
+        if fallback_file == resolved_file:
+            raise
+        fallback_parent = os.path.dirname(fallback_file)
+        if fallback_parent:
+            os.makedirs(fallback_parent, exist_ok=True)
+        with open(fallback_file, "w", encoding="utf-8") as file:
+            json.dump(settings, file)
 
 
 def update_units(
@@ -53,10 +74,6 @@ def update_units(
     units[1] = speed_unit_label_fn(state.units_speed)
     units[4] = temp_unit_label_fn(state.units_temp)
     refresh_settings_fn()
-
-
-def speed_unit_label(value: object) -> str:
-    return "MPH" if value in (1, "1", "MPH", "mph") else "KPH"
 
 
 def build_refresh_setting_values_fn(
@@ -77,27 +94,6 @@ def build_refresh_units_fn(
     temp_unit_label_fn: Callable[[object], str],
 ) -> Callable[[], None]:
     return partial(update_units, state, units, refresh_settings_fn, speed_unit_label, temp_unit_label_fn)
-
-
-def build_show_setting_screen_fn(
-    state: Any,
-    settings: dict[str, object],
-    setting_text: list[str],
-    settings_adjustable_indexes: set[int],
-    read_parameter_options: Sequence[object],
-    gauge: Any,
-    show_gauge_fn: Callable[..., None],
-) -> Callable[[], None]:
-    return partial(
-        show_setting_screen,
-        state,
-        settings,
-        setting_text,
-        settings_adjustable_indexes,
-        read_parameter_options,
-        gauge,
-        show_gauge_fn,
-    )
 
 
 def build_toggle_read_parameter_fn(
@@ -130,151 +126,6 @@ def build_finalize_read_parameters_fn(
         update_reader_settings_fn,
         update_settings_values_fn,
     )
-
-
-def show_settings_list_screen(
-    gauge: Any,
-    setting_text: list[str],
-    setting_values: list[Any],
-    selected_index: int,
-    setting_editing: bool,
-    settings_adjustable_indexes: set[int],
-) -> None:
-    width = gauge.disp.height
-    height = gauge.disp.width
-    image = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-
-    title = "Settings"
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
-
-    body_font = _list_body_font()
-    start_y = 36
-    bottom_margin = 18
-    max_visible_rows = 5
-    total_rows = len(setting_text)
-    visible_rows = min(max_visible_rows, total_rows)
-    row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
-    visible_start = max(0, min(selected_index - (visible_rows // 2), max(total_rows - visible_rows, 0)))
-    visible_end = min(total_rows, visible_start + visible_rows)
-
-    for visible_row, row_index in enumerate(range(visible_start, visible_end)):
-        label = setting_text[row_index]
-        y = start_y + (visible_row * row_height)
-        is_selected = row_index == selected_index
-
-        if is_selected:
-            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
-
-        pointer = ">" if is_selected else " "
-        value_text = str(setting_values[row_index]) if row_index < len(setting_values) else ""
-        edit_tag = " [EDIT]" if (is_selected and setting_editing and row_index in settings_adjustable_indexes) else ""
-        line = f"{pointer} {label}: {value_text}{edit_tag}"
-        text_color = (240, 240, 240) if is_selected else (165, 165, 165)
-        draw.text((8, y + 2), line, font=body_font, fill=text_color)
-
-    footer = "Up/Down: Adjust  Select: Save" if setting_editing else "Up/Down: Navigate  Select: Edit"
-    draw.text((8, height - 20), footer, font=body_font, fill=(180, 180, 180))
-
-    if gauge.rotation_degrees:
-        image = image.rotate(gauge.rotation_degrees)
-
-    gauge.disp.ShowImage(image)
-
-
-def _truncate_text(text: str, max_length: int) -> str:
-    if len(text) <= max_length:
-        return text
-    if max_length <= 3:
-        return text[:max_length]
-    return text[: max_length - 3] + "..."
-
-
-def show_read_parameters_screen(
-    gauge: Any,
-    read_parameter_options: Sequence[object],
-    selected_codes: list[int],
-    cursor_index: int,
-) -> None:
-    width = gauge.disp.height
-    height = gauge.disp.width
-    image = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-
-    title = "Read Parameters"
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
-
-    body_font = _list_body_font()
-    top_y = 30
-    footer_y = height - 18
-    max_visible_rows = 5
-
-    option_count = len(read_parameter_options)
-    visible_rows = min(max_visible_rows, max(1, option_count))
-    row_height = max(13, (footer_y - top_y) // max(1, visible_rows))
-    cursor_index = max(0, min(cursor_index, max(option_count - 1, 0)))
-    visible_start = max(0, min(cursor_index - (visible_rows // 2), max(option_count - visible_rows, 0)))
-    visible_end = min(option_count, visible_start + visible_rows)
-
-    for visible_row, option in enumerate(read_parameter_options[visible_start:visible_end]):
-        row_index = visible_start + visible_row
-        option_code = int(getattr(option, "code", 0))
-        option_label = str(getattr(option, "label", read_parameter_label(option_code)))
-        y = top_y + (visible_row * row_height)
-        is_selected = option_code in selected_codes
-        is_cursor = row_index == cursor_index
-
-        if is_cursor:
-            draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
-
-        pointer = ">" if is_cursor else " "
-        check = "[x]" if is_selected else "[ ]"
-        label = _truncate_text(f"0x{option_code:02X} {option_label}", 16)
-        text_color = (240, 240, 240) if is_cursor else (165, 165, 165)
-        draw.text((8, y + 2), f"{pointer} {check} {label}", font=body_font, fill=text_color)
-
-    footer = "Up/Down: Navigate  Select: Toggle  Mode: Back"
-    draw.text((8, footer_y), footer, font=body_font, fill=(180, 180, 180))
-
-    if gauge.rotation_degrees:
-        image = image.rotate(gauge.rotation_degrees)
-
-    gauge.disp.ShowImage(image)
-
-
-def show_info_screen(gauge: Any) -> None:
-    width = gauge.disp.height
-    height = gauge.disp.width
-    image = Image.new("RGB", (width, height), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
-
-    title = "Info"
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
-
-    body_font = ImageFont.load_default()
-    line_gap = 4
-    line_sizes = [gauge._text_size(draw, line, body_font) for line in INFO_LINES]
-    total_height = sum(height for _, height in line_sizes) + (line_gap * (len(INFO_LINES) - 1))
-    y_cursor = max(32, (height - total_height) // 2)
-
-    for line, (line_width, line_height) in zip(INFO_LINES, line_sizes):
-        if not line:
-            y_cursor += line_height + line_gap
-            continue
-        draw.text(((width - line_width) // 2, y_cursor), line, font=body_font, fill=(220, 220, 220))
-        y_cursor += line_height + line_gap
-
-    footer = "Select to return"
-    footer_width, _ = gauge._text_size(draw, footer, body_font)
-    draw.text(((width - footer_width) // 2, height - 14), footer, font=body_font, fill=(180, 180, 180))
-
-    if gauge.rotation_degrees:
-        image = image.rotate(gauge.rotation_degrees)
-
-    gauge.disp.ShowImage(image)
 
 
 def build_apply_settings_to_runtime_fn(
@@ -373,43 +224,6 @@ def build_cycle_default_display_fn(
     config_file: str,
 ) -> Callable[[], None]:
     return partial(cycle_default_display, state, settings, display_text, save_config_fn, config_file)
-
-
-def show_setting_screen(
-    state: Any,
-    settings: dict[str, object],
-    setting_text: list[str],
-    settings_adjustable_indexes: set[int],
-    read_parameter_options: Sequence[object],
-    gauge: Any,
-    show_gauge_fn: Callable[..., None],
-) -> None:
-    with state.acquire_lock():
-        setting_index = state.setting_index
-        setting_editing = state.setting_editing
-        setting_info_view = state.setting_info_view
-        setting_in_item = state.setting_in_item
-        setting_values = state.setting_values.copy()
-
-    if setting_info_view:
-        show_info_screen(gauge)
-        return
-
-    if setting_in_item and setting_text[setting_index] == "Read Parameters":
-        with state.acquire_lock():
-            cursor_index = state.read_parameter_index
-        selected_codes = normalize_read_parameters(settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS))
-        show_read_parameters_screen(gauge, read_parameter_options, selected_codes, cursor_index)
-        return
-
-    show_settings_list_screen(
-        gauge,
-        setting_text,
-        setting_values,
-        setting_index,
-        setting_editing,
-        settings_adjustable_indexes,
-    )
 
 
 def update_setting_values(

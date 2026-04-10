@@ -1,18 +1,18 @@
-# NOTE PORT is passed into ReadStream from Main.py.
+from __future__ import annotations
 
-import serial #type: ignore
 import threading
-import datetime
 import time
-import os
+from pathlib import Path
 from typing import Optional
 
-from dependencies.consult_protocol import extract_first_consult_frame
-from dependencies.consult_registers import DEFAULT_READ_PARAMETERS, build_stream_request, normalize_read_parameters
-from dependencies.settings import Load_Config
+import serial  # type: ignore
+
+from dependencies.consult.protocol import extract_first_consult_frame
+from dependencies.consult.registers import DEFAULT_READ_PARAMETERS, build_stream_request, normalize_read_parameters
+from dependencies.modes.settings import Load_Config
 
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "configJSON.json")
+CONFIG_FILE = str(Path(__file__).resolve().parents[2] / "config" / "configJSON.json")
 
 
 def get_stream_value_for_code(
@@ -83,6 +83,7 @@ def get_stream_value_for_code(
 
     return float(raw_values.get(code, 0.0))
 
+
 class ReadStream(threading.Thread):
     def __init__(self, port, daemon, settings=None):
         threading.Thread.__init__(self)
@@ -94,7 +95,7 @@ class ReadStream(threading.Thread):
         self.MAF_Value = 0
         self.MAF_RH_Value = 0
         self.TEMP_Value = 0
-        self.O2_Value =0
+        self.O2_Value = 0
         self.O2_RH_Value = 0
         self.SPEED_Value = 0
         self.BATT_Value = 0
@@ -102,7 +103,7 @@ class ReadStream(threading.Thread):
         self.FUELTEMP_Value = 0
         self.IAT_Value = 0
         self.EGT_Value = 0
-        self.INJ_Value = 0  
+        self.INJ_Value = 0
         self.INJ_RH_Value = 0
         self.TIM_Value = 0
         self.AAC_Value = 0
@@ -127,11 +128,10 @@ class ReadStream(threading.Thread):
         self.read_parameters = list(DEFAULT_READ_PARAMETERS)
         self._stream_needs_restart = True
         self.update_settings(initial_settings)
-        
+
         self.start()
 
     def update_settings(self, settings_obj):
-        """Update conversion settings at runtime from config JSON values."""
         source = settings_obj if isinstance(settings_obj, dict) else {}
         with self._settings_lock:
             self.settings = dict(source)
@@ -150,7 +150,7 @@ class ReadStream(threading.Thread):
         self.MAF_Value = 0
         self.MAF_RH_Value = 0
         self.TEMP_Value = 0
-        self.O2_Value =0
+        self.O2_Value = 0
         self.O2_RH_Value = 0
         self.SPEED_Value = 0
         self.BATT_Value = 0
@@ -281,10 +281,10 @@ class ReadStream(threading.Thread):
     def _current_frame_length(self) -> int:
         with self._settings_lock:
             return len(self.read_parameters) + 2
-                
+
     def consume_data(self):
         read_thread = True
-        while read_thread == True:
+        while read_thread is True:
             if self._stream_needs_restart:
                 if self._stream_started:
                     self._stop_stream_command()
@@ -317,7 +317,7 @@ class ReadStream(threading.Thread):
 
             dataList = list(incomingData)
             self._last_payload_time = time.monotonic()
-                
+
             try:
                 self._reset_sensor_values()
 
@@ -335,43 +335,43 @@ class ReadStream(threading.Thread):
     def run(self):
         self.consume_data()
 
-    def convertToRev(self,inputData): # RPM
-        return int(round((inputData * 12.5),2)) 
+    def convertToRev(self, inputData):
+        return int(round((inputData * 12.5), 2))
 
-    def convertToMAF(self,inputData): # Volts
+    def convertToMAF(self, inputData):
         return inputData * 5 / 1000
-    
-    def convertToTemp(self,inputData):
+
+    def convertToTemp(self, inputData):
         with self._settings_lock:
             units_temp = self.units_temp
-        if units_temp == 'F':
-            return (inputData - 50) * 9/5 + 32
+        if units_temp == "F":
+            return (inputData - 50) * 9 / 5 + 32
         return inputData - 50
-    
-    def convertToO2(self,inputData): # Volts
+
+    def convertToO2(self, inputData):
         return inputData * 10 / 1000
 
-    def convertToSpeed(self,inputData):
+    def convertToSpeed(self, inputData):
         with self._settings_lock:
             units_speed = self.units_speed
-        if units_speed == 'MPH':
+        if units_speed == "MPH":
             return int(round((inputData * 2.11) * 0.621371192237334))
         return int(round((inputData * 2.11)))
 
-    def convertToBattery(self,inputData): # Volts
-        return round(((inputData * 80) / 1000),1)
-    
-    def convertToTPS(self,inputData): # Volts
+    def convertToBattery(self, inputData):
+        return round(((inputData * 80) / 1000), 1)
+
+    def convertToTPS(self, inputData):
         return inputData * 20 / 1000
 
-    def convertToEGT(self,inputData): # Degrees F
+    def convertToEGT(self, inputData):
         return inputData * 20 / 1000
 
-    def convertToAAC(self,inputData):  # % Duty Cycle
+    def convertToAAC(self, inputData):
         return inputData / 2
 
-    def convertToInjection(self,inputData): # % Duty Cycle
+    def convertToInjection(self, inputData):
         return inputData / 100
 
-    def convertToTiming(self,inputData): # Degrees BTDC
+    def convertToTiming(self, inputData):
         return 110 - inputData

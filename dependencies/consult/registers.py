@@ -40,37 +40,15 @@ READ_PARAMETER_OPTIONS: list[ReadParameterOption] = [
     ReadParameterOption(0x1C, "AFAlphaLSelfLear", "AF SLFLRN", "%"),
     ReadParameterOption(0x1D, "AFAlphaRSelfLear", "RH AF SLFLRN", "%"),
 
-    ReadParameterOption(0x13, "Digital 0x13", "D13", "raw"), # A/C switch, Power Steering, Neutral/Park, Start signal, closed TPS
-    ReadParameterOption(0x1E, "Digital 0x1E", "D1E", "raw"), # A/C Relay, Fuel Pump Relay, VTC solenoid, Coolant Fan Hi, Coolant Fan Lo
-    ReadParameterOption(0x1F, "Digital 0x1F", "D1F", "raw"), # P/Reg control, Wastegate Solenoid, IACV/FICD Solenoid, EGR Solenoid
-    ReadParameterOption(0x21, "Digital 0x21", "D21", "raw"), # LH Bank Lean, RH Bank Lean
-
-    # These ones below don't have conversions listed in the documentation. Maybe will look into them later.
-    # ReadParameterOption(0x28, "Wastegate Solenoid", "WG"),
-
-    # ReadParameterOption(0x14, "Injection Time LH MSB", "INJH"),
-    # ReadParameterOption(0x25, "Purge Vol Control Valve Step", "PURG"),
-    # ReadParameterOption(0x26, "Tank Fuel Temp", "TNKT"),
-    # ReadParameterOption(0x27, "FPCM DR Voltage", "FPCV"),
-    # ReadParameterOption(0x29, "Turbo Boost Sensor Voltage", "BOOST"),
-    # ReadParameterOption(0x2A, "Engine Mount On/Off", "MNT"),
-    # ReadParameterOption(0x2E, "Position Counter", "PCNT"),
-    # ReadParameterOption(0x2F, "Fuel Gauge Voltage", "FGV"),
-    # ReadParameterOption(0x30, "FR O2 Heater B1", "O2H1"),
-    # ReadParameterOption(0x31, "FR O2 Heater B2", "O2H2"),
-    # ReadParameterOption(0x32, "Ignition Switch", "IGN"),
-    # ReadParameterOption(0x33, "CAL/LD Value", "LOAD"),
-    # ReadParameterOption(0x34, "B/Fuel Schedule", "BFS"),
-    # ReadParameterOption(0x35, "RR O2 Sensor Voltage", "RRO2"),
-    # ReadParameterOption(0x36, "RR O2 Sensor B2 Voltage", "RRO2B2"),
-    # ReadParameterOption(0x38, "MAF g/s", "MAFGS"),
-    # ReadParameterOption(0x39, "Evap System Pressure Voltage", "EVAP"),
+    ReadParameterOption(0x13, "Digital 0x13", "D13", "raw"),
+    ReadParameterOption(0x1E, "Digital 0x1E", "D1E", "raw"),
+    ReadParameterOption(0x1F, "Digital 0x1F", "D1F", "raw"),
+    ReadParameterOption(0x21, "Digital 0x21", "D21", "raw"),
 ]
 
 READ_PARAMETER_LABELS = {option.code: option.label for option in READ_PARAMETER_OPTIONS}
 READ_PARAMETER_TITLES = {option.code: option.title for option in READ_PARAMETER_OPTIONS}
 READ_PARAMETER_UNITS = {option.code: option.unit for option in READ_PARAMETER_OPTIONS}
-# Keep startup defaults aligned to the known-good legacy stream profile.
 DEFAULT_READ_PARAMETERS = [0x1E, 0x16, 0x0B, 0x01, 0x08, 0x0C, 0x0D, 0x05, 0x09, 0x13, 0x17, 0x1A, 0x1C, 0x1F, 0x21]
 DISPLAY_REGISTER_TO_INDEX = {
     0x01: 0,

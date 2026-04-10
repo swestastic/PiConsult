@@ -4,7 +4,7 @@ import math
 import time
 from typing import Callable
 
-from dependencies.gauge import get_stream_range
+from dependencies.modes.data_stream import get_stream_range
 
 
 def elapsed_since(start_time: float) -> float:

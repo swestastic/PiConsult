@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Render a configurable gauge needle on the Waveshare 1.9" LCD.
-
-Usage example:
-    python3 gauge_needle_display.py --min 0 --max 8000 --value 3200 --title RPM --unit rpm
-"""
+"""Render a configurable gauge needle on the Waveshare 1.9" LCD."""
 
 from __future__ import annotations
 
@@ -17,8 +13,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-BASE_DIR = Path(__file__).resolve().parent
-DISPLAY_DIR_CANDIDATES = (BASE_DIR / "NewDisplay", BASE_DIR / "New Display")
+DEPENDENCIES_DIR = Path(__file__).resolve().parents[2]
+DISPLAY_DIR_CANDIDATES = (DEPENDENCIES_DIR / "NewDisplay", DEPENDENCIES_DIR / "New Display")
 DISPLAY_DIR = next((path for path in DISPLAY_DIR_CANDIDATES if path.exists()), DISPLAY_DIR_CANDIDATES[0])
 
 if str(DISPLAY_DIR) not in sys.path:
@@ -60,28 +56,31 @@ class GaugeNeedleDisplay:
         self._outer_radius = 0
         self._inner_radius = 0
         self._static_bg: Image.Image | None = None
-        self._static_title: str = ""
+        self._static_bg_key: tuple[str, float, float] | None = None
         self._value_layout_key: tuple[float, float] | None = None
         self._reserved_value_size: tuple[int, int] = (0, 0)
+        self._footer_font = ImageFont.load_default()
+        self._text_size_cache: dict[tuple[int, str], tuple[int, int]] = {}
 
         self.title_font = ImageFont.load_default()
         self.label_font = ImageFont.load_default()
         self.value_font = ImageFont.load_default()
         self.unit_font = ImageFont.load_default()
 
-        font_dir_candidates = [DISPLAY_DIR / "Font", BASE_DIR / "Font"]
-        fallback_font_path = BASE_DIR / "Font.ttc"
+        common_font_path = DEPENDENCIES_DIR / "common" / "Font.ttf"
+        font_dir = DEPENDENCIES_DIR / "Font"
+        fallback_font_path = DEPENDENCIES_DIR / "Font.ttc"
 
         title_font_candidates = [
-            directory / "Font01.ttf" for directory in font_dir_candidates
-        ] + [
-            directory / "Font00.ttf" for directory in font_dir_candidates
-        ] + [
+            font_dir / "Font01.ttf",
+            common_font_path,
+            font_dir / "Font00.ttf",
             fallback_font_path,
         ]
         body_font_candidates = [
-            directory / "Font02.ttf" for directory in font_dir_candidates
-        ] + title_font_candidates
+            font_dir / "Font02.ttf",
+            *title_font_candidates,
+        ]
         self.title_font = self._load_font(
             title_font_candidates,
             30,
@@ -120,7 +119,7 @@ class GaugeNeedleDisplay:
             return DesktopDisplay(scale=scale)
 
         try:
-            from dependencies.lib import LCD_1inch9  # type: ignore
+            from dependencies.hardware.lcd_display import LCD_1inch9  # type: ignore
 
             if SPI is not None:
                 return LCD_1inch9.LCD_1inch9(
@@ -178,12 +177,13 @@ class GaugeNeedleDisplay:
         title_y = (height // 2) - (title_height // 2)
         draw.text((title_x, title_y), title, font=self.title_font, fill=(255, 255, 255))
 
-        self._static_title = title
         return image
 
     def _get_static_background(self, title: str) -> Image.Image:
-        if self._static_bg is None or self._static_title != title:
+        static_key = (title, self.min_value, self.max_value)
+        if self._static_bg is None or self._static_bg_key != static_key:
             self._static_bg = self._build_static_background(title)
+            self._static_bg_key = static_key
         return self._static_bg
 
     def set_range(self, min_value: float, max_value: float) -> None:
@@ -201,7 +201,6 @@ class GaugeNeedleDisplay:
         min_text = f"{self.min_value:g}"
         max_text = f"{self.max_value:g}"
         max_chars = max(len(min_text), len(max_text), 1)
-        # Use wide glyphs for conservative fixed layout width.
         reserve_text = "8" * max_chars
         self._reserved_value_size = self._text_size(draw, reserve_text, self.value_font)
         self._value_layout_key = layout_key
@@ -222,13 +221,25 @@ class GaugeNeedleDisplay:
 
     @staticmethod
     def _text_size(draw: ImageDraw.ImageDraw, text: str, font: object) -> tuple[int, int]:
+        cache_key = (id(font), text)
+        cache = getattr(draw, "_gauge_text_size_cache", None)
+        if isinstance(cache, dict):
+            cached_size = cache.get(cache_key)
+            if cached_size is not None:
+                return cached_size
+
         textbbox_fn = getattr(draw, "textbbox", None)
         if callable(textbbox_fn):
             try:
                 bbox: Any = textbbox_fn((0, 0), text, font=font)
                 if isinstance(bbox, tuple) and len(bbox) >= 4:
                     left, top, right, bottom = bbox[:4]
-                    return int(right - left), int(bottom - top)
+                    size = (int(right - left), int(bottom - top))
+                    if isinstance(cache, dict):
+                        if len(cache) > 1024:
+                            cache.clear()
+                        cache[cache_key] = size
+                    return size
             except Exception:
                 pass
 
@@ -238,7 +249,12 @@ class GaugeNeedleDisplay:
                 size: Any = textsize_fn(text, font=font)
                 if isinstance(size, tuple) and len(size) >= 2:
                     width, height = size[:2]
-                    return int(width), int(height)
+                    measured = (int(width), int(height))
+                    if isinstance(cache, dict):
+                        if len(cache) > 1024:
+                            cache.clear()
+                        cache[cache_key] = measured
+                    return measured
             except Exception:
                 pass
 
@@ -248,11 +264,21 @@ class GaugeNeedleDisplay:
                 size: Any = getsize_fn(text)
                 if isinstance(size, tuple) and len(size) >= 2:
                     width, height = size[:2]
-                    return int(width), int(height)
+                    measured = (int(width), int(height))
+                    if isinstance(cache, dict):
+                        if len(cache) > 1024:
+                            cache.clear()
+                        cache[cache_key] = measured
+                    return measured
             except Exception:
                 pass
 
-        return len(text) * 10, 18
+        fallback = (len(text) * 10, 18)
+        if isinstance(cache, dict):
+            if len(cache) > 1024:
+                cache.clear()
+            cache[cache_key] = fallback
+        return fallback
 
     def _wrap_text_lines(
         self,
@@ -263,7 +289,6 @@ class GaugeNeedleDisplay:
         *,
         max_lines: int = 3,
     ) -> list[str]:
-        """Wrap text to fit within max_width using word and fallback character wrapping."""
         normalized = " ".join(str(text).split())
         if not normalized:
             return [""]
@@ -290,7 +315,6 @@ class GaugeNeedleDisplay:
                 current = word
                 continue
 
-            # Fallback: hard-wrap very long tokens that cannot fit in one line.
             chunk = ""
             for ch in word:
                 next_chunk = f"{chunk}{ch}"
@@ -337,6 +361,7 @@ class GaugeNeedleDisplay:
             image = Image.new("RGB", (self.disp.height, self.disp.width), (0, 0, 0))
 
         draw = ImageDraw.Draw(image)
+        draw._gauge_text_size_cache = self._text_size_cache
         width, height = image.size
 
         if show_dial and show_needle:
@@ -403,7 +428,7 @@ class GaugeNeedleDisplay:
             draw.text((value_x, value_y), value_str, font=self.value_font, fill=(255, 220, 120))
 
         footer_bottom_limit = height - 2
-        footer_font = ImageFont.load_default()
+        footer_font = self._footer_font
         if footer_text and not show_dial:
             _footer_w, footer_h = self._text_size(draw, footer_text, footer_font)
             footer_bottom_limit = max(no_dial_content_top, height - footer_h - 8)
@@ -453,7 +478,6 @@ class GaugeNeedleDisplay:
         if active_warning_lines:
             textbbox_fn = getattr(draw, "textbbox", None)
             line_metrics: list[tuple[str, int, int, int, int, int]] = []
-            # Metrics tuple: (line, left, top, right, bottom, height)
             for line in active_warning_lines:
                 if callable(textbbox_fn):
                     bbox = textbbox_fn((0, 0), line, font=self.unit_font)

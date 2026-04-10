@@ -25,9 +25,10 @@ def local_ui_requested(default: bool = False) -> bool:
 class LocalButton:
     """Minimal gpiozero.Button-like class used by the desktop simulator."""
 
-    def __init__(self, pin: int, hold_time: float = 0.5) -> None:
+    def __init__(self, pin: int, hold_time: float = 0.5, bounce_time: float | None = None) -> None:
         self.pin = int(pin)
         self.hold_time = float(hold_time)
+        self.bounce_time = None if bounce_time is None else float(bounce_time)
         self.when_pressed: Optional[Callable[[], None]] = None
         _BUTTON_REGISTRY[self.pin] = self
 

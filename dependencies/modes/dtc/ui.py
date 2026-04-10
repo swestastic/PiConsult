@@ -1,7 +1,5 @@
 import time
-from typing import Any, Callable, Optional
-
-import serial
+from typing import Any, Callable
 
 
 def show_dtc_screen(state: Any, show_gauge: Callable[..., None], dtc_titles: dict[int, str]) -> None:
@@ -47,46 +45,4 @@ def show_dtc_screen(state: Any, show_gauge: Callable[..., None], dtc_titles: dic
         show_dial=False,
         show_value_text=False,
         footer_text="Select: Clear Codes",
-    )
-
-
-def update_dtc_codes_from_ecu(
-    state: Any,
-    port_obj: Optional[serial.Serial],
-    *,
-    demo_mode: bool,
-    read_dtc_codes_fn: Callable[[serial.Serial], list[int]],
-) -> None:
-    """Refresh state DTC list from ECU or demo values."""
-    if demo_mode:
-        # Example sample codes for menu/navigation testing.
-        sample_codes = [13, 34, 43]
-        with state.acquire_lock():
-            state.dtc_codes = sample_codes
-            state.dtc_index = min(state.dtc_index, max(len(sample_codes) - 1, 0))
-        return
-
-    if port_obj is None:
-        with state.acquire_lock():
-            state.dtc_codes = []
-            state.dtc_index = 0
-        return
-
-    codes = read_dtc_codes_fn(port_obj)
-    with state.acquire_lock():
-        state.dtc_codes = codes
-        state.dtc_index = min(state.dtc_index, max(len(codes) - 1, 0))
-
-
-def refresh_dtc_codes_for_buttons(
-    state_obj: Any,
-    port_obj: Optional[serial.Serial],
-    demo_mode: bool,
-    read_dtc_codes_fn: Callable[[serial.Serial], list[int]],
-) -> None:
-    update_dtc_codes_from_ecu(
-        state_obj,
-        port_obj,
-        demo_mode=demo_mode,
-        read_dtc_codes_fn=read_dtc_codes_fn,
     )

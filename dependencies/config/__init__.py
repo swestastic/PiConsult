@@ -1,12 +1,12 @@
 # /*****************************************************************************
-# * | File        :	  config.py
+# * | File        :      config.py
 # * | Author      :   Waveshare team
 # * | Function    :   Hardware underlying interface,for Raspberry pi
 # * | Info        :
 # *----------------
 # * | This version:   V1.0
 # * | Date        :   2020-06-17
-# * | Info        :   
+# * | Info        :
 # ******************************************************************************/
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documnetation files (the "Software"), to deal
@@ -30,7 +30,6 @@
 
 import time
 import importlib
-import ctypes
 
 try:
     SMBus = importlib.import_module("smbus").SMBus
@@ -96,33 +95,32 @@ UP_BUTTON_PIN = 23
 DOWN_BUTTON_PIN = 17
 BUTTON_HOLD_TIME_SECONDS = 0.5
 
+
 class RaspberryPi:
-    def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=10000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
+    def __init__(self, spi=spidev.SpiDev(0, 0), spi_freq=10000000, rst=27, dc=25, bl=18, bl_freq=1000, i2c=None):
         self.INPUT = False
         self.OUTPUT = True
-        
-        self.SPEED  =spi_freq
 
-        if(Device_SPI == 1):
+        self.SPEED = spi_freq
+
+        if Device_SPI == 1:
             self.Device = Device_SPI
             self.spi = spi
-        else :
+        else:
             self.Device = Device_I2C
             self.address = 0x3c
             self.bus = SMBus(1)
-        
-        self.RST_PIN = self.gpio_mode(rst,self.OUTPUT)
-        self.DC_PIN = self.gpio_mode(dc,self.OUTPUT)
 
+        self.RST_PIN = self.gpio_mode(rst, self.OUTPUT)
+        self.DC_PIN = self.gpio_mode(dc, self.OUTPUT)
 
-    def delay_ms(self,delaytime):
+    def delay_ms(self, delaytime):
         time.sleep(delaytime / 1000.0)
 
-    def gpio_mode(self,Pin,Mode,pull_up = None,active_state = True):
+    def gpio_mode(self, Pin, Mode, pull_up=None, active_state=True):
         if Mode:
-            return DigitalOutputDevice(Pin,active_high = True,initial_value =False)
-        else:
-            return DigitalInputDevice(Pin,pull_up=pull_up,active_state=active_state)
+            return DigitalOutputDevice(Pin, active_high=True, initial_value=False)
+        return DigitalInputDevice(Pin, pull_up=pull_up, active_state=active_state)
 
     def digital_write(self, Pin, value):
         if value:
@@ -133,26 +131,27 @@ class RaspberryPi:
     def digital_read(self, Pin):
         return Pin.value
 
-    def spi_writebyte(self,data):
+    def spi_writebyte(self, data):
         self.spi.writebytes([data[0]])
 
-    def i2c_writebyte(self,reg, value):
+    def i2c_writebyte(self, reg, value):
         self.bus.write_byte_data(self.address, reg, value)
-    
-    def module_init(self): 
-        self.digital_write(self.RST_PIN,False)
-        if(self.Device == Device_SPI):
+
+    def module_init(self):
+        self.digital_write(self.RST_PIN, False)
+        if self.Device == Device_SPI:
             self.spi.max_speed_hz = self.SPEED
-            self.spi.mode = 0b11  
-        self.digital_write(self.DC_PIN,False)
+            self.spi.mode = 0b11
+        self.digital_write(self.DC_PIN, False)
         return 0
 
     def module_exit(self):
-        if(self.Device == Device_SPI):
+        if self.Device == Device_SPI:
             self.spi.close()
-        else :
+        else:
             self.bus.close()
-        self.digital_write(self.RST_PIN,False)
-        self.digital_write(self.DC_PIN,False)
+        self.digital_write(self.RST_PIN, False)
+        self.digital_write(self.DC_PIN, False)
+
 
 ### END OF FILE ###
