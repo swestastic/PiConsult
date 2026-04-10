@@ -64,7 +64,6 @@ from dependencies.digital_mode import (
 from dependencies.dtc_mode import (
     refresh_dtc_codes_for_buttons,
     show_dtc_screen,
-    update_dtc_codes_from_ecu,
 )
 
 try:
@@ -832,13 +831,6 @@ read_thread_active = False
 
 apply_settings_to_runtime()
 
-update_dtc_codes_from_ecu(
-    state,
-    None,
-    demo_mode=DEMO_MODE,
-    read_dtc_codes_fn=READ_DTC_CODES,
-)
-
 # Set up event-based button callbacks (must be done once before main loop)
 setup_button_callbacks(ModeButton, SelectButton, UpButton, DownButton)
 
@@ -856,12 +848,6 @@ else:
     # Start background threads
     if ECU_Connected:
         R = ReadStream(port=PORT, daemon=True, settings=Settings)
-        update_dtc_codes_from_ecu(
-            state,
-            PORT,
-            demo_mode=False,
-            read_dtc_codes_fn=READ_DTC_CODES,
-        )
         read_thread_active = True
 
 # Main loop
@@ -984,8 +970,8 @@ try:
                         code: get_stream_value_for_code(code, reader, {}, speed_correction)
                         for code in selected_stream_codes
                     }
-                    rpm_value = float(current_value_map.get(0x01, 0.0))
-                    temp_value = float(current_value_map.get(0x08, 0.0))
+                    rpm_value = float(current_value_map.get(0x01, 0.0)) # used for RPM warning check
+                    temp_value = float(current_value_map.get(0x08, 0.0)) # used for coolant temp warning check
 
                 state.update_stream_peaks(current_value_map)
 
