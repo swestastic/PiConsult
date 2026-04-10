@@ -49,9 +49,13 @@ def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -
     parent_dir = os.path.dirname(resolved_file)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
+
+    serializable_settings = dict(settings)
+    serializable_settings["Read_Parameters"] = [f"0x{code:02X}" for code in normalize_read_parameters(settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS))]
+
     try:
         with open(resolved_file, "w", encoding="utf-8") as file:
-            json.dump(settings, file, indent=4)
+            json.dump(serializable_settings, file, indent=4)
             file.write("\n")
         return
     except OSError:
@@ -62,7 +66,7 @@ def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -
         if fallback_parent:
             os.makedirs(fallback_parent, exist_ok=True)
         with open(fallback_file, "w", encoding="utf-8") as file:
-            json.dump(settings, file, indent=4)
+            json.dump(serializable_settings, file, indent=4)
             file.write("\n")
 
 

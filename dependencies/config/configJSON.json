@@ -9,16 +9,14 @@
     "Log_Index": 0,
     "Gauge_Display_Mode": "Gauge + Value",
     "Read_Parameters": [
-        19,
-        30,
-        31,
-        1,
-        5,
-        8,
-        9,
-        11,
-        12,
-        13,
-        33
+        "0x13",
+        "0x1E",
+        "0x1F",
+        "0x08",
+        "0x09",
+        "0x0B",
+        "0x0C",
+        "0x0D",
+        "0x21"
     ]
 }
