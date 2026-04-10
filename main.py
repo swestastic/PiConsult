@@ -64,6 +64,13 @@ from dependencies.dtc_mode import (
     show_dtc_screen,
 )
 from dependencies.demo import build_demo_stream_snapshot, elapsed_since, initialize_demo_mode
+from dependencies.config import (
+    MODE_BUTTON_PIN,
+    SELECT_BUTTON_PIN,
+    UP_BUTTON_PIN,
+    DOWN_BUTTON_PIN,
+    BUTTON_HOLD_TIME_SECONDS,
+)
 
 try:
     from gpiozero import Button as GpioButton  # type: ignore
@@ -215,10 +222,10 @@ DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30")
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
 
 # Buttons
-ModeButton = Button(26, hold_time=0.5) #17
-SelectButton = Button(16, hold_time=0.5) #26
-UpButton = Button(23, hold_time=0.5) #23
-DownButton = Button(17, hold_time=0.5) #16
+ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
+SelectButton = Button(SELECT_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
+UpButton = Button(UP_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
+DownButton = Button(DOWN_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS)
 
 # Mode constants
 DISPLAY_MODE = 0

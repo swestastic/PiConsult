@@ -89,6 +89,13 @@ except ModuleNotFoundError:
 Device_SPI = 1
 Device_I2C = 0
 
+# Consult box button GPIO assignments
+MODE_BUTTON_PIN = 26
+SELECT_BUTTON_PIN = 16
+UP_BUTTON_PIN = 23
+DOWN_BUTTON_PIN = 17
+BUTTON_HOLD_TIME_SECONDS = 0.5
+
 class RaspberryPi:
     def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=10000000,rst = 27,dc = 25,bl = 18,bl_freq=1000,i2c=None):
         self.INPUT = False
