@@ -88,17 +88,6 @@ View binary values in the ECU that tell you when solenoids or other switches are
 
 **0x21:** LH Bank Lean, RH Bank Lean
 
-## Current Bugs/Issues/ToDos
-
-- Active tests not disabling cleanly
-- Screen is off center in STL files
-- Footer font inconsistent in DTC mode
-- DTCs not reading correctly
-- `configJSON.json` Read Parameters are magic numbers, should be actual read parameters or registers
-- Text is cut off in some menu items, needs to be scrolling or wrapped
-- Crash logs don't seem to be working correctly
-- Button debouncing could use some fine tuning
-
 ## Future Features
 
 - More active test options
@@ -195,7 +184,9 @@ Notes:
 
 I am actively looking for other contributors to help keep this project going! Ultimately this is something that I made for personal use, but decided to publish since I think the community could benefit from it. To keep long term support, add features, and improve the project all around I will need additional help :). Feel free to open issues, fork the repo, and open pull requests for bug fixes, additional features, etc.
 
-The local UI is there for testing, although updates should be tested on Pi hardware as well before they're merged. You can message me `Discord: @swestastic` as well for any clarifications or questions on how things are set up.
+The local UI is there for testing, although updates should be tested on Pi hardware as well before they're merged. Add the flag `--demo` when running `main.py` to bypass ECU connect and drive the displays with dummy data. This will let you test functionality of the gauges, menus, etc. without needing a physical device or ECU nearby.
+
+You can message me `Discord: @swestastic` as well for any clarifications or questions on how things are set up.
 
 ## Acknowledgements
 
