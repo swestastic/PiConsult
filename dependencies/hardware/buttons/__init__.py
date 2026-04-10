@@ -108,7 +108,7 @@ def process_buttons(
 					if state.dtc_clear_confirm_active:
 						state.dtc_clear_confirm_yes = not state.dtc_clear_confirm_yes
 					else:
-						state.dtc_index = (state.dtc_index - 1) % max(len(state.dtc_codes), 1)
+						state.dtc_index = (state.dtc_index + 1) % max(len(state.dtc_codes), 1)
 			elif current_mode == settings_mode:
 				with state.acquire_lock():
 					setting_index = state.setting_index
@@ -152,11 +152,11 @@ def process_buttons(
 						should_adjust = False
 
 				if should_adjust:
-					adjust_active_test_value_fn(-1, port_obj, demo_mode, state, send_activation_command_fn, temp_unit_label_fn)
+					adjust_active_test_value_fn(1, port_obj, demo_mode, state, send_activation_command_fn, temp_unit_label_fn)
 			elif current_mode == digital_bits_mode:
 				if selected_digital_registers:
 					with state.acquire_lock():
-						state.digital_page_index = (state.digital_page_index - 1) % len(selected_digital_registers)
+						state.digital_page_index = (state.digital_page_index + 1) % len(selected_digital_registers)
 			elif current_mode == mode_menu_mode:
 				with state.acquire_lock():
 					state.mode_menu_index = (state.mode_menu_index - 1) % len(mode_menu_targets)
@@ -174,7 +174,7 @@ def process_buttons(
 					if state.dtc_clear_confirm_active:
 						state.dtc_clear_confirm_yes = not state.dtc_clear_confirm_yes
 					else:
-						state.dtc_index = (state.dtc_index + 1) % max(len(state.dtc_codes), 1)
+						state.dtc_index = (state.dtc_index - 1) % max(len(state.dtc_codes), 1)
 			elif current_mode == settings_mode:
 				with state.acquire_lock():
 					setting_index = state.setting_index
@@ -218,11 +218,11 @@ def process_buttons(
 						should_adjust = False
 
 				if should_adjust:
-					adjust_active_test_value_fn(1, port_obj, demo_mode, state, send_activation_command_fn, temp_unit_label_fn)
+					adjust_active_test_value_fn(-1, port_obj, demo_mode, state, send_activation_command_fn, temp_unit_label_fn)
 			elif current_mode == digital_bits_mode:
 				if selected_digital_registers:
 					with state.acquire_lock():
-						state.digital_page_index = (state.digital_page_index + 1) % len(selected_digital_registers)
+						state.digital_page_index = (state.digital_page_index - 1) % len(selected_digital_registers)
 			elif current_mode == mode_menu_mode:
 				with state.acquire_lock():
 					state.mode_menu_index = (state.mode_menu_index + 1) % len(mode_menu_targets)

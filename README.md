@@ -91,11 +91,9 @@ View binary values in the ECU that tell you when solenoids or other switches are
 ## Current Bugs/Issues/ToDos
 
 - Active tests not disabling cleanly
-- Low framerate on Pi with gauge display
-- Fix screen centering in STL files
-- Fix footer inconsistencies in some menus
-- There may be some bugs in the DTC reader, I've been getting inconsistent results.
-- Inconsistent Up/Down behavior (Up/Down buttons are switched on some menus)
+- Screen is off center in STL files
+- Footer font inconsistent in DTC mode
+- DTCs not reading correctly
 - `configJSON.json` Read Parameters are magic numbers, should be actual read parameters or registers
 - Text is cut off in some menu items, needs to be scrolling or wrapped
 - Crash logs don't seem to be working correctly
