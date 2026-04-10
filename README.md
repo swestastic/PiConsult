@@ -99,6 +99,7 @@ View binary values in the ECU that tell you when solenoids or other switches are
 - `configJSON.json` Read Parameters are magic numbers, should be actual read parameters or registers
 - Text is cut off in some menu items, needs to be scrolling or wrapped
 - Crash logs don't seem to be working correctly
+- Button debouncing could use some fine tuning
 
 ## Future Features
 
