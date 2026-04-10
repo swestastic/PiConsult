@@ -14,6 +14,75 @@ from dependencies.settings import Load_Config
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "configJSON.json")
 
+
+def get_stream_value_for_code(
+    code: int,
+    reader: Optional[object],
+    demo_value_map: dict[int, float],
+    speed_correction: float,
+    units_temp: object,
+) -> float:
+    if code == 0x0B:
+        return float(demo_value_map.get(code, 0.0) * speed_correction) if reader is None else float(getattr(reader, "SPEED_Value", 0.0)) * speed_correction
+    if code == 0x01:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "RPM_Value", 0.0))
+    if code == 0x08:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TEMP_Value", 0.0))
+    if code == 0x0C:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "BATT_Value", 0.0))
+    if code == 0x0D:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TPS_Value", 0.0))
+    if code == 0x03:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "MAF_Value", 0.0))
+    if code == 0x09:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "INJ_Value", 0.0))
+    if code == 0x16:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TIM_Value", 0.0))
+    if code == 0x17:
+        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "AAC_Value", 0.0))
+
+    if reader is None:
+        return float(demo_value_map.get(code, 0.0))
+
+    raw_values = getattr(reader, "register_values", {})
+    raw_value = float(raw_values.get(code, 0.0))
+
+    if code in {0x03, 0x04, 0x05, 0x06, 0x07, 0x12, 0x27, 0x29, 0x2F, 0x35, 0x36, 0x39}:
+        return raw_value * 5.0 / 1000.0
+
+    if code in {0x0A}:
+        return raw_value * 10.0 / 1000.0
+
+    if code in {0x0F, 0x11, 0x26}:
+        temp_c = raw_value - 50.0
+        if str(units_temp).upper() == "F":
+            return (temp_c * 9.0 / 5.0) + 32.0
+        return temp_c
+
+    if code in {0x15}:
+        msb = int(raw_values.get(0x14, 0)) & 0xFF
+        lsb = int(raw_values.get(0x15, 0)) & 0xFF
+        return float(((msb << 8) | lsb) / 100.0)
+
+    if code in {0x23}:
+        msb = int(raw_values.get(0x22, 0)) & 0xFF
+        lsb = int(raw_values.get(0x23, 0)) & 0xFF
+        return float(((msb << 8) | lsb) / 100.0)
+
+    if code in {0x1A, 0x1B, 0x1C, 0x1D}:
+        return raw_value
+
+    if code in {0x28}:
+        return raw_value / 2.0
+
+    if code in {0x33}:
+        return raw_value / 2.55
+
+    if code in {0x38}:
+        return raw_value
+
+    return float(raw_values.get(code, 0.0))
+
 class ReadStream(threading.Thread):
     def __init__(self, port, daemon, settings=None):
         threading.Thread.__init__(self)
@@ -33,7 +102,7 @@ class ReadStream(threading.Thread):
         self.FUELTEMP_Value = 0
         self.IAT_Value = 0
         self.EGT_Value = 0
-        self.INJ_Value = 0
+        self.INJ_Value = 0  
         self.INJ_RH_Value = 0
         self.TIM_Value = 0
         self.AAC_Value = 0
@@ -78,15 +147,11 @@ class ReadStream(threading.Thread):
 
     def _reset_sensor_values(self) -> None:
         self.RPM_Value = 0
-
         self.MAF_Value = 0
         self.MAF_RH_Value = 0
-
         self.TEMP_Value = 0
-
         self.O2_Value =0
         self.O2_RH_Value = 0
-
         self.SPEED_Value = 0
         self.BATT_Value = 0
         self.TPS_Value = 0
@@ -97,6 +162,11 @@ class ReadStream(threading.Thread):
         self.INJ_RH_Value = 0
         self.TIM_Value = 0
         self.AAC_Value = 0
+
+        self.AFAlpha_Value = 0
+        self.AFAlpha_RH_Value = 0
+        self.AFAlpha_SL_Value = 0
+        self.AFAlpha_RH_SL_Value = 0
 
         self.DIGITAL_13 = 0
         self.DIGITAL_1E = 0

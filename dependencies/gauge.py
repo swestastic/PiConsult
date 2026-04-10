@@ -528,6 +528,66 @@ class GaugeNeedleDisplay:
             pass
 
 
+def get_stream_range(code: int, units_speed: object, units_temp: object) -> tuple[float, float]:
+    speed_max = 150.0 if str(units_speed).upper() == "MPH" else 240.0
+    temp_max = 260.0 if str(units_temp).upper() == "F" else 130.0
+
+    ranges = {
+        0x01: (0.0, 8000.0),
+        0x05: (0.0, 5.0),
+        0x07: (0.0, 5.0),
+        0x08: (20.0, temp_max),
+        0x09: (0.0, 100.0),
+        0x0A: (0.0, 100.0),
+        0x0B: (0.0, speed_max),
+        0x0C: (8.0, 15.0),
+        0x0D: (0.0, 5.0),
+        0x0F: (20.0, temp_max),
+        0x11: (20.0, temp_max),
+        0x12: (20.0, temp_max),
+        0x15: (0.0, 20.0),
+        0x23: (0.0, 20.0),
+        0x16: (0.0, 70.0),
+        0x17: (0.0, 100.0),
+        0x1A: (60.0, 140.0),
+        0x1B: (60.0, 140.0),
+        0x1C: (60.0, 140.0),
+        0x1D: (60.0, 140.0),
+    }
+    return ranges.get(code, (0.0, 255.0))
+
+
+def show_gauge(
+    display: GaugeNeedleDisplay,
+    title: str,
+    value: float,
+    unit: str,
+    minimum: float,
+    maximum: float,
+    *,
+    show_needle: bool = True,
+    show_dial: bool = True,
+    show_value_text: bool = True,
+    value_text: str | None = None,
+    warning_text: str | None = None,
+    warning_lines: list[str] | None = None,
+    footer_text: str | None = None,
+) -> None:
+    display.set_range(minimum, maximum)
+    display.show_value(
+        value,
+        title=title,
+        unit=unit,
+        show_needle=show_needle,
+        show_dial=show_dial,
+        show_value_text=show_value_text,
+        value_text=value_text,
+        warning_text=warning_text,
+        warning_lines=warning_lines,
+        footer_text=footer_text,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render a gauge needle on Waveshare 1.9 LCD")
     parser.add_argument("--min", dest="minimum", type=float, required=True, help="Lower bound")

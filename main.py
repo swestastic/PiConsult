@@ -5,14 +5,13 @@ import serial
 import threading
 from functools import lru_cache
 from pathlib import Path
-import numpy as np
 from typing import Optional, Any
 from PIL import Image, ImageDraw, ImageFont
 
 from dependencies.Buttons import process_buttons as process_button_events, setup_button_callbacks
 from dependencies.dtc_dict import dtc_codes as DTC_CODE_TITLES
 from dependencies.settings import Load_Config, Save_Config
-from dependencies.read import ReadStream
+from dependencies.read import ReadStream, get_stream_value_for_code
 from dependencies.logs import Create_Log_File, WriteLog
 from dependencies.local_ui import LocalButton, local_ui_requested
 from dependencies.active_test_mode import (
@@ -24,7 +23,6 @@ from dependencies.active_test_mode import (
     ACTIVE_TEST_POWER_BALANCE,
     ACTIVE_TEST_FUEL_PUMP,
     ACTIVE_TEST_CLEAR_SELF_LEARN,
-    apply_active_test_effects_to_demo_values,
     adjust_active_test_value,
     run_active_test_action,
     show_active_test_screen,
@@ -65,13 +63,14 @@ from dependencies.dtc_mode import (
     refresh_dtc_codes_for_buttons,
     show_dtc_screen,
 )
+from dependencies.demo import build_demo_stream_snapshot, elapsed_since, initialize_demo_mode
 
 try:
     from gpiozero import Button as GpioButton  # type: ignore
 except Exception:
     GpioButton = None
 
-from dependencies.gauge import GaugeNeedleDisplay
+from dependencies.gauge import GaugeNeedleDisplay, get_stream_range, show_gauge as render_gauge
 
 
 def parse_args() -> argparse.Namespace:
@@ -131,165 +130,6 @@ def format_stream_value_text(code: int, value: float, unit: str) -> str:
     return f"{value:.2f}"
 
 
-def build_demo_stream_value_map(elapsed_seconds: float) -> dict[int, float]:
-    values = get_demo_values(elapsed_seconds)
-    return {
-        0x01: float(values[0]),
-
-        0x05: float(values[1]),
-        0x07: float(values[1]),
-
-        0x08: float(values[2]),
-
-        0x09: float(values[3]),
-        0x0A: float(values[3]),
-
-        0x0B: float(values[4]),
-        0x0C: float(values[5]),
-        0x0D: float(values[6]),
-        0x0F: float(values[7]),
-        0x0D: float(values[8]),
-        0x11: float(values[9]),
-        0x12: float(values[10]),
-        0x15: float(values[10]),
-        0x23: float(values[11]),
-        0x16: float(values[12]),
-        0x17: float(values[13]),
-        0x1A: float(values[13]),
-        0x1B: float(values[13]),
-        0x1C: float(values[13]),
-        0x1D: float(values[13]),
-    }
-
-
-def get_stream_value_for_code(code: int, reader: Optional[object], demo_value_map: dict[int, float], speed_correction: float) -> float:
-    if code == 0x0B:
-        return float(demo_value_map.get(code, 0.0) * speed_correction) if reader is None else float(getattr(reader, "SPEED_Value", 0.0)) * speed_correction
-    if code == 0x01:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "RPM_Value", 0.0))
-    if code == 0x08:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TEMP_Value", 0.0))
-    if code == 0x0C:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "BATT_Value", 0.0))
-    if code == 0x0D:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TPS_Value", 0.0))
-    if code == 0x03:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "MAF_Value", 0.0))
-    if code == 0x09:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "INJ_Value", 0.0))
-    if code == 0x16:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "TIM_Value", 0.0))
-    if code == 0x17:
-        return float(demo_value_map.get(code, 0.0)) if reader is None else float(getattr(reader, "AAC_Value", 0.0))
-
-    if reader is None:
-        return float(demo_value_map.get(code, 0.0))
-
-    with_units_temp = Units_Temp
-    raw_values = getattr(reader, "register_values", {})
-    raw_value = float(raw_values.get(code, 0.0))
-
-    if code in {0x03, 0x04, 0x05, 0x06, 0x07, 0x12, 0x27, 0x29, 0x2F, 0x35, 0x36, 0x39}:
-        return raw_value * 5.0 / 1000.0
-
-    if code in {0x0A}:
-        return raw_value * 10.0 / 1000.0
-
-    if code in {0x0F, 0x11, 0x26}:
-        temp_c = raw_value - 50.0
-        if str(with_units_temp).upper() == "F":
-            return (temp_c * 9.0 / 5.0) + 32.0
-        return temp_c
-
-    if code in {0x15}:
-        msb = int(raw_values.get(0x14, 0)) & 0xFF
-        lsb = int(raw_values.get(0x15, 0)) & 0xFF
-        return float(((msb << 8) | lsb) / 100.0)
-
-    if code in {0x23}:
-        msb = int(raw_values.get(0x22, 0)) & 0xFF
-        lsb = int(raw_values.get(0x23, 0)) & 0xFF
-        return float(((msb << 8) | lsb) / 100.0)
-
-    if code in {0x1A, 0x1B, 0x1C, 0x1D}:
-        return raw_value
-
-    if code in {0x28}:
-        return raw_value / 2.0
-
-    if code in {0x33}:
-        return raw_value / 2.55
-
-    if code in {0x38}:
-        return raw_value
-
-    return float(raw_values.get(code, 0.0))
-
-
-def get_stream_range(code: int, units_speed: object, units_temp: object) -> tuple[float, float]:
-    speed_max = 150.0 if str(units_speed).upper() == "MPH" else 240.0
-    temp_max = 260.0 if str(units_temp).upper() == "F" else 130.0
-
-    ranges = {
-        0x01: (0.0, 8000.0), # RPM
-
-        0x05: (0.0, 5.0), # MAF (LH)
-        0x07: (0.0, 5.0), # MAF (RH)
-
-        0x08: (20.0, temp_max), # Coolant Temp
-
-        0x09: (0.0, 100.0), # LH O2 
-        0x0A: (0.0, 100.0), # RH O2
-
-        0x0B: (0.0, speed_max), # Speed
-        0x0C: (8.0, 15.0), # Battery Voltage
-        0x0D: (0.0, 5.0), # TPS
-        0x0F: (20.0, temp_max), # Fuel Temp
-        0x11: (20.0, temp_max), # IAT
-        0x12: (20.0, temp_max), # EGT
-        0x15: (0.0, 20.0), # Injection Time (LH)
-        0x23: (0.0, 20.0), # Injection Time (RH)
-        0x16: (0.0, 70.0), # Ignition Timing
-        0x17: (0.0, 100.0), # AAC Duty Cycle
-
-        0x1A: (60.0, 140.0), # AF Alpha (LH)
-        0x1B: (60.0, 140.0), # AF Alpha (RH)
-        0x1C: (60.0, 140.0), # AF Alpha Self learn (LH)
-        0x1D: (60.0, 140.0), # AF Alpha Self learn (RH)
-    }
-    return ranges.get(code, (0.0, 255.0))
-
-
-def show_gauge(
-    title: str,
-    value: float,
-    unit: str,
-    minimum: float,
-    maximum: float,
-    *,
-    show_needle: bool = True,
-    show_dial: bool = True,
-    show_value_text: bool = True,
-    value_text: Optional[str] = None,
-    warning_text: Optional[str] = None,
-    warning_lines: Optional[list[str]] = None,
-    footer_text: Optional[str] = None,
-) -> None:
-    gauge.set_range(minimum, maximum)
-    gauge.show_value(
-        value,
-        title=title,
-        unit=unit,
-        show_needle=show_needle,
-        show_dial=show_dial,
-        show_value_text=show_value_text,
-        value_text=value_text,
-        warning_text=warning_text,
-        warning_lines=warning_lines,
-        footer_text=footer_text,
-    )
-
-
 def WriteText(upper: object, lower: object) -> None:
     title = str(upper) if upper is not None else ""
     lower_text = str(lower) if lower is not None else ""
@@ -338,6 +178,38 @@ gauge = GaugeNeedleDisplay(
     spi_freq_hz=GAUGE_SPI_FREQ,
     rotation_degrees=GAUGE_ROTATION,
 )
+
+
+def show_gauge(
+    title: str,
+    value: float,
+    unit: str,
+    minimum: float,
+    maximum: float,
+    *,
+    show_needle: bool = True,
+    show_dial: bool = True,
+    show_value_text: bool = True,
+    value_text: Optional[str] = None,
+    warning_text: Optional[str] = None,
+    warning_lines: Optional[list[str]] = None,
+    footer_text: Optional[str] = None,
+) -> None:
+    render_gauge(
+        gauge,
+        title,
+        value,
+        unit,
+        minimum,
+        maximum,
+        show_needle=show_needle,
+        show_dial=show_dial,
+        show_value_text=show_value_text,
+        value_text=value_text,
+        warning_text=warning_text,
+        warning_lines=warning_lines,
+        footer_text=footer_text,
+    )
 
 DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30"), 30.0))
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
@@ -759,25 +631,6 @@ def send_activation_command(
     )
 
 
-def get_demo_values(elapsed_seconds: float) -> list[float]:
-    rpm = 900.0 + 5000.0 * (0.6 + 0.6 * np.sin(elapsed_seconds * 1.6))
-    maf = 0.6 + 3.6 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.1 + 1.2))
-    temp = 120.0 + 45.0 * (0.5 + 2 * np.sin(elapsed_seconds + 1.4))
-    o2 = 0.1 + 0.9 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.3 + 0.7))
-    speed = 10.0 + 95.0 * (0.7 + 0.7 * np.sin(elapsed_seconds * 0.9))
-    batt = 12.8 + 1.2 * (0.5 + 0.5 * np.sin(elapsed_seconds * 0.55 + 1.4))
-    tps = 0.4 + 3.9 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.5 + 1.8))
-    fueltemp = 100.0 + 20.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.2 + 1.6))
-    iat = 0.5 + 0.45 * np.sin(elapsed_seconds * 1.4 + 0.9)
-    egt = 300.0 + 400.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 0.8 + 2.1))
-    inj = 2.0 + 48.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.4 + 0.4))
-    tim = 5.0 + 32.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.0 + 2.0))
-    aac = 8.0 + 62.0 * (0.5 + 0.5 * np.sin(elapsed_seconds * 1.3 + 2.3))
-    afalpha = 0.5 + 0.45 * np.sin(elapsed_seconds * 1.2 + 0.3)
-
-    return [rpm, maf, temp, o2, speed, batt, tps, fueltemp, iat, egt, inj, tim, aac, afalpha]
-
-
 def pump_local_ui_events() -> bool:
     pump_fn = getattr(gauge.disp, "pump_events", None)
     if callable(pump_fn):
@@ -826,7 +679,7 @@ def ECU_Connect(port_obj: serial.Serial) -> bool:
 
 R: Optional[Any] = None
 PORT: Optional[serial.Serial] = None
-demo_start_time = time.monotonic()
+demo_start_time = 0.0
 read_thread_active = False
 
 apply_settings_to_runtime()
@@ -835,7 +688,7 @@ apply_settings_to_runtime()
 setup_button_callbacks(ModeButton, SelectButton, UpButton, DownButton)
 
 if DEMO_MODE:
-    WriteText("DEMO MODE", "No ECU")
+    demo_start_time = initialize_demo_mode(WriteText)
     read_thread_active = True
 else:
     # Connect serial and ECU
@@ -912,7 +765,7 @@ try:
 
         # Refresh digital register values for digital bit pages.
         if DEMO_MODE:
-            elapsed = time.monotonic() - demo_start_time
+            elapsed = elapsed_since(demo_start_time)
             update_digital_registers_from_demo(state, elapsed)
         elif R is not None:
             update_digital_registers_from_reader(state, R, parse_int)
@@ -949,12 +802,13 @@ try:
                 )
             else:
                 if DEMO_MODE:
-                    elapsed = time.monotonic() - demo_start_time
-                    demo_value_map = build_demo_stream_value_map(elapsed)
                     with state.acquire_lock():
+                        units_speed = state.units_speed
+                        units_temp = state.units_temp
+                        elapsed, demo_value_map = build_demo_stream_snapshot(demo_start_time, units_speed, units_temp)
                         speed_correction = state.speed_correction
                     current_value_map = {
-                        code: get_stream_value_for_code(code, None, demo_value_map, speed_correction)
+                        code: get_stream_value_for_code(code, None, demo_value_map, speed_correction, units_temp)
                         for code in selected_stream_codes
                     }
                     rpm_value = float(current_value_map.get(0x01, 0.0))
@@ -966,8 +820,9 @@ try:
                         continue
                     with state.acquire_lock():
                         speed_correction = state.speed_correction
+                        units_temp = state.units_temp
                     current_value_map = {
-                        code: get_stream_value_for_code(code, reader, {}, speed_correction)
+                        code: get_stream_value_for_code(code, reader, {}, speed_correction, units_temp)
                         for code in selected_stream_codes
                     }
                     rpm_value = float(current_value_map.get(0x01, 0.0)) # used for RPM warning check
