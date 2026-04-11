@@ -361,7 +361,7 @@ class GaugeNeedleDisplay:
             image = Image.new("RGB", (self.disp.height, self.disp.width), (0, 0, 0))
 
         draw = ImageDraw.Draw(image)
-        draw._gauge_text_size_cache = self._text_size_cache
+        setattr(draw, "_gauge_text_size_cache", self._text_size_cache)
         width, height = image.size
 
         if show_dial and show_needle:
@@ -383,8 +383,9 @@ class GaugeNeedleDisplay:
 
         no_dial_content_top = 0
 
+        reserved_value_width, reserved_value_height = self._get_reserved_value_size(draw)
+
         if show_dial:
-            reserved_value_width, reserved_value_height = self._get_reserved_value_size(draw)
             value_y = self._center_y + 56
             title_center_x = self._center_x
             value_x = title_center_x - (value_width // 2)
@@ -419,7 +420,7 @@ class GaugeNeedleDisplay:
             value_x = title_center_x - (value_width // 2)
             value_y = (height // 2) + 4
             unit_x_anchor = title_center_x + (value_width // 2) + 8
-            unit_y_anchor = value_y + (value_height - unit_height) // 2
+            unit_y_anchor = value_y + max(0, (reserved_value_height - unit_height) // 2)
 
         if value_y + value_height > height - 2:
             value_y = max(0, height - value_height - 2)
