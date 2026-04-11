@@ -3,7 +3,7 @@ from typing import Any, Callable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
 
-from dependencies.common.ui import draw_scrollable_menu_screen, get_list_body_font
+from dependencies.common.ui import draw_scrollable_menu_screen
 from dependencies.consult.registers import (
     DEFAULT_READ_PARAMETERS,
     normalize_read_parameters,
@@ -60,7 +60,7 @@ def show_settings_list_screen(
         text_color = (240, 240, 240) if is_selected else (165, 165, 165)
         return line, text_color
 
-    footer = "Up/Down: Adjust  Select: Save" if setting_editing else "Up/Down: Navigate  Select: Edit"
+    footer = "Up/Dn: Adjust  Select: Save Mode: Back" if setting_editing else "Up/Dn: Navigate  Select: Edit Mode: Back"
     draw_scrollable_menu_screen(gauge, "Settings", setting_text, selected_index, _line_builder, footer)
 
 
@@ -78,7 +78,7 @@ def show_read_parameters_screen(
     selected_codes: list[int],
     cursor_index: int,
 ) -> None:
-    body_font = get_list_body_font()
+    body_font = getattr(gauge, "menu_font", ImageFont.load_default())
 
     def _line_builder(option: object, _row_index: int, is_cursor: bool) -> tuple[str, tuple[int, int, int]]:
         option_code = int(getattr(option, "code", 0))
@@ -90,7 +90,7 @@ def show_read_parameters_screen(
         text_color = (240, 240, 240) if is_cursor else (165, 165, 165)
         return f"{pointer} {check} {label}", text_color
 
-    footer = "Up/Down: Navigate  Select: Toggle  Mode: Back"
+    footer = "Up/Dn: Navigate  Select: Toggle  Mode: Back"
     draw_scrollable_menu_screen(
         gauge,
         "Read Parameters",
@@ -127,9 +127,9 @@ def show_info_screen(gauge: Any) -> None:
         draw.text(((width - line_width) // 2, y_cursor), line, font=body_font, fill=(220, 220, 220))
         y_cursor += line_height + line_gap
 
-    footer = "Select to return"
-    footer_width, _ = gauge._text_size(draw, footer, body_font)
-    draw.text(((width - footer_width) // 2, height - 14), footer, font=body_font, fill=(180, 180, 180))
+    footer = "Mode/Select: Back"
+    footer_font = getattr(gauge, "footer_font", body_font)
+    draw.text((8, height - 19), footer, font=footer_font, fill=(180, 180, 180))
 
     if gauge.rotation_degrees:
         image = image.rotate(gauge.rotation_degrees)

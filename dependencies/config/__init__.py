@@ -96,6 +96,14 @@ DOWN_BUTTON_PIN = 17
 BUTTON_HOLD_TIME_SECONDS = 0.5
 BUTTON_BOUNCE_TIME_SECONDS = 0.05
 
+# UI font sizing
+FOOTER_FONT_SIZE = 14 # Used for footers and secondary text in the menu
+MENU_FONT_SIZE = 18 # Menu list items
+MENU_TITLE_FONT_SIZE = 24 # Titles atop menus
+GAUGE_RANGE_FONT_SIZE = 18 # Min/Max values on gauge display
+GAUGE_VALUE_FONT_SIZE = 40 # Value text on gauge display
+VALUE_ONLY_FONT_SIZE = 50 # Value text when in "Value Only" display mode
+
 
 class RaspberryPi:
     def __init__(self, spi=spidev.SpiDev(0, 0), spi_freq=10000000, rst=27, dc=25, bl=18, bl_freq=1000, i2c=None):

@@ -34,6 +34,12 @@ class GaugeNeedleDisplay:
         min_value: float,
         max_value: float,
         *,
+        footer_font_size: int = 18,
+        menu_font_size: int = 18,
+        menu_title_font_size: int = 30,
+        gauge_range_font_size: int = 18,
+        gauge_value_font_size: int = 40,
+        value_only_font_size: int = 40,
         backlight_percent: int = 55,
         spi_freq_hz: int = 24_000_000,
         rotation_degrees: int = 0,
@@ -57,10 +63,15 @@ class GaugeNeedleDisplay:
         self._inner_radius = 0
         self._static_bg: Image.Image | None = None
         self._static_bg_key: tuple[str, float, float] | None = None
-        self._value_layout_key: tuple[float, float] | None = None
+        self._value_layout_key: tuple[float, float, int] | None = None
         self._reserved_value_size: tuple[int, int] = (0, 0)
         self._footer_font = ImageFont.load_default()
         self._text_size_cache: dict[tuple[int, str], tuple[int, int]] = {}
+        self.menu_font = ImageFont.load_default()
+        self.menu_title_font = ImageFont.load_default()
+        self.footer_font = ImageFont.load_default()
+        self.gauge_range_font = ImageFont.load_default()
+        self.value_only_font = ImageFont.load_default()
 
         self.title_font = ImageFont.load_default()
         self.label_font = ImageFont.load_default()
@@ -88,8 +99,13 @@ class GaugeNeedleDisplay:
         )
         self.value_font = self._load_font(
             title_font_candidates,
-            40,
+            max(1, int(gauge_value_font_size)),
             role="value",
+        )
+        self.value_only_font = self._load_font(
+            title_font_candidates,
+            max(1, int(value_only_font_size)),
+            role="value-only",
         )
         self.unit_font = self._load_font(
             title_font_candidates,
@@ -101,6 +117,27 @@ class GaugeNeedleDisplay:
             30,
             role="label",
         )
+        self.gauge_range_font = self._load_font(
+            body_font_candidates,
+            max(1, int(gauge_range_font_size)),
+            role="gauge-range",
+        )
+        self.menu_font = self._load_font(
+            body_font_candidates,
+            max(1, int(menu_font_size)),
+            role="menu",
+        )
+        self.menu_title_font = self._load_font(
+            body_font_candidates,
+            max(1, int(menu_title_font_size)),
+            role="menu-title",
+        )
+        self.footer_font = self._load_font(
+            body_font_candidates,
+            max(1, int(footer_font_size)),
+            role="footer",
+        )
+        self._footer_font = self.footer_font
 
         prefer_local_ui = local_ui_requested(default=(os.name == "nt"))
         self.disp = self._create_display_backend(prefer_local_ui)
@@ -169,8 +206,8 @@ class GaugeNeedleDisplay:
 
         min_x, min_y = self._point_on_circle(self._center_x, self._center_y, self._outer_radius + 12, self.start_angle_deg + self._gauge_angle_offset)
         max_x, max_y = self._point_on_circle(self._center_x, self._center_y, self._outer_radius + 12, self.end_angle_deg + self._gauge_angle_offset)
-        draw.text((min_x - 16, min_y - 8), f"{self.min_value:g}", font=self.label_font, fill=(160, 160, 160))
-        draw.text((max_x - 16, max_y - 8), f"{self.max_value:g}", font=self.label_font, fill=(160, 160, 160))
+        draw.text((min_x - 16, min_y - 8), f"{self.min_value:g}", font=self.gauge_range_font, fill=(160, 160, 160))
+        draw.text((max_x - 16, max_y - 8), f"{self.max_value:g}", font=self.gauge_range_font, fill=(160, 160, 160))
 
         title_width, title_height = self._text_size(draw, title, self.title_font)
         title_x = (width - title_width) // 2
@@ -193,8 +230,8 @@ class GaugeNeedleDisplay:
         self.max_value = float(max_value)
         self._value_layout_key = None
 
-    def _get_reserved_value_size(self, draw: ImageDraw.ImageDraw) -> tuple[int, int]:
-        layout_key = (self.min_value, self.max_value)
+    def _get_reserved_value_size(self, draw: ImageDraw.ImageDraw, font: object) -> tuple[int, int]:
+        layout_key = (self.min_value, self.max_value, id(font))
         if self._value_layout_key == layout_key and self._reserved_value_size != (0, 0):
             return self._reserved_value_size
 
@@ -202,7 +239,7 @@ class GaugeNeedleDisplay:
         max_text = f"{self.max_value:g}"
         max_chars = max(len(min_text), len(max_text), 1)
         reserve_text = "8" * max_chars
-        self._reserved_value_size = self._text_size(draw, reserve_text, self.value_font)
+        self._reserved_value_size = self._text_size(draw, reserve_text, font)
         self._value_layout_key = layout_key
         return self._reserved_value_size
 
@@ -372,18 +409,20 @@ class GaugeNeedleDisplay:
 
         if show_value_text:
             value_str = value_text if value_text is not None else f"{value:g}"
-            value_width, value_height = self._text_size(draw, value_str, self.value_font)
+            value_font = self.value_font if show_dial else self.value_only_font
+            value_width, value_height = self._text_size(draw, value_str, value_font)
             unit_str = unit if unit else ""
             unit_width, unit_height = self._text_size(draw, unit_str, self.unit_font) if unit_str else (0, 0)
         else:
             value_str = ""
+            value_font = self.value_font
             value_width, value_height = 0, 0
             unit_str = unit if unit else ""
             unit_width, unit_height = self._text_size(draw, unit_str, self.unit_font) if unit_str else (0, 0)
 
         no_dial_content_top = 0
 
-        reserved_value_width, reserved_value_height = self._get_reserved_value_size(draw)
+        reserved_value_width, reserved_value_height = self._get_reserved_value_size(draw, value_font)
 
         if show_dial:
             value_y = self._center_y + 56
@@ -392,6 +431,7 @@ class GaugeNeedleDisplay:
             unit_x_anchor = title_center_x + (value_width // 2) + 8
             unit_y_anchor = value_y + max(0, (reserved_value_height - unit_height) // 2)
         else:
+            value_only_vertical_shift = 10 if show_value_text else 0
             wrapped_title_lines = self._wrap_text_lines(
                 draw,
                 title,
@@ -403,7 +443,7 @@ class GaugeNeedleDisplay:
             line_gap = 2
             title_line_sizes = [self._text_size(draw, line, self.title_font) for line in wrapped_title_lines]
             title_block_height = sum(h for _, h in title_line_sizes) + (line_gap * (len(title_line_sizes) - 1))
-            title_y = max(6, (height // 2) - title_block_height - 10)
+            title_y = max(6, (height // 2) - title_block_height - 10 - value_only_vertical_shift)
 
             y_cursor = title_y
             for line, (line_w, line_h) in zip(wrapped_title_lines, title_line_sizes):
@@ -418,7 +458,7 @@ class GaugeNeedleDisplay:
                 combined_width = unit_width
             title_center_x = width // 2
             value_x = title_center_x - (value_width // 2)
-            value_y = (height // 2) + 4
+            value_y = (height // 2) + 4 - value_only_vertical_shift
             unit_x_anchor = title_center_x + (value_width // 2) + 8
             unit_y_anchor = value_y + max(0, (reserved_value_height - unit_height) // 2)
 
@@ -426,7 +466,7 @@ class GaugeNeedleDisplay:
             value_y = max(0, height - value_height - 2)
 
         if show_value_text and value_str:
-            draw.text((value_x, value_y), value_str, font=self.value_font, fill=(255, 220, 120))
+            draw.text((value_x, value_y), value_str, font=value_font, fill=(255, 220, 120))
 
         footer_bottom_limit = height - 2
         footer_font = self._footer_font
@@ -467,7 +507,7 @@ class GaugeNeedleDisplay:
         if footer_text and not show_dial:
             _footer_w, footer_h = self._text_size(draw, footer_text, footer_font)
             footer_x = 8
-            footer_y = height - footer_h - 4
+            footer_y = height - 19
             draw.text((footer_x, footer_y), footer_text, font=footer_font, fill=(180, 180, 180))
 
         active_warning_lines: list[str] = []

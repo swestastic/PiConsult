@@ -69,7 +69,7 @@ def show_power_balance_menu_screen(gauge: Any, editing: bool, cursor_selection: 
         text_color = (255, 130, 130) if is_off else ((240, 240, 240) if is_selected else (165, 165, 165))
         return line, text_color
 
-    footer = "Select: Toggle/Exit  Up/Down: Choose" if editing else "Select to edit"
+    footer = "Up/Dn: Navigate  Select: Toggle  Mode: Back" if editing else "Select to edit"
     draw_scrollable_menu_screen(gauge, title, rows, selected_index, _line_builder, footer)
 
 
@@ -97,7 +97,7 @@ def show_active_test_list_screen(
         text_color = (240, 240, 240) if is_selected else (165, 165, 165)
         return line, text_color
 
-    footer = "Up/Down: Adjust  Select: Save" if editing else "Up/Down: Navigate  Select: Edit"
+    footer = "Up/Dn: Adjust  Select: Save" if editing else "Up/Dn: Navigate  Select: Edit  Mode: Back"
     draw_scrollable_menu_screen(gauge, "Active Tests", ACTIVE_TEST_ITEMS, selected_index, _line_builder, footer)
 
 

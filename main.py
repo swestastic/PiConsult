@@ -61,6 +61,12 @@ from dependencies.config import (
     DOWN_BUTTON_PIN,
     BUTTON_HOLD_TIME_SECONDS,
     BUTTON_BOUNCE_TIME_SECONDS,
+    FOOTER_FONT_SIZE,
+    MENU_FONT_SIZE,
+    MENU_TITLE_FONT_SIZE,
+    GAUGE_RANGE_FONT_SIZE,
+    GAUGE_VALUE_FONT_SIZE,
+    VALUE_ONLY_FONT_SIZE,
 )
 
 try:
@@ -138,6 +144,12 @@ Settings = Load_Config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
 Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
 Settings.setdefault("Read_Parameters", list(DEFAULT_READ_PARAMETERS))
+Settings.pop("Footer_Font_Size", None)
+Settings.pop("Menu_Font_Size", None)
+Settings.pop("Menu_Title_Font_Size", None)
+Settings.pop("Gauge_Range_Font_Size", None)
+Settings.pop("Gauge_Value_Font_Size", None)
+Settings.pop("Value_Only_Font_Size", None)
 Settings["Log_Index"] += 1
 Save_Config(CONF, Settings)
 Log_Index = int(Settings["Log_Index"])
@@ -162,6 +174,12 @@ GAUGE_SPI_FREQ = int(os.getenv("CONSULT_GAUGE_SPI_FREQ", "24000000"))
 gauge = GaugeNeedleDisplay(
     min_value=0,
     max_value=100,
+    footer_font_size=FOOTER_FONT_SIZE,
+    menu_font_size=MENU_FONT_SIZE,
+    menu_title_font_size=MENU_TITLE_FONT_SIZE,
+    gauge_range_font_size=GAUGE_RANGE_FONT_SIZE,
+    gauge_value_font_size=GAUGE_VALUE_FONT_SIZE,
+    value_only_font_size=VALUE_ONLY_FONT_SIZE,
     backlight_percent=GAUGE_BACKLIGHT,
     spi_freq_hz=GAUGE_SPI_FREQ,
     rotation_degrees=GAUGE_ROTATION,
@@ -556,7 +574,7 @@ def show_mode_menu_screen(display_mode_enabled: bool, digital_mode_enabled: bool
             text_color = (120, 120, 120)
         return line, text_color
 
-    footer = "Up/Down: Navigate  Select: Open"
+    footer = "Up/Dn: Navigate  Select: Open"
     draw_scrollable_menu_screen(gauge, "Select Mode", MODE_MENU_ITEMS, mode_menu_index, _line_builder, footer)
 
 

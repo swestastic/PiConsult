@@ -33,7 +33,7 @@ def draw_scrollable_menu_screen(
     footer_text: str,
     *,
     font: Any | None = None,
-    start_y: int = 36,
+    start_y: int = 32,
     bottom_margin: int = 18,
     max_visible_rows: int = 5,
 ) -> None:
@@ -42,15 +42,17 @@ def draw_scrollable_menu_screen(
     image = Image.new("RGB", (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+    title_font = getattr(gauge, "menu_title_font", None) or gauge.label_font
+    title_width, _ = gauge._text_size(draw, title, title_font)
+    draw.text(((width - title_width) // 2, 4), title, font=title_font, fill=(255, 255, 255))
 
     if font is None:
-        font = get_list_body_font()
+        font = getattr(gauge, "menu_font", None) or get_list_body_font()
+    footer_font = getattr(gauge, "footer_font", None) or font
 
     total_rows = len(rows)
     if total_rows <= 0:
-        draw.text((8, height - 23), footer_text, font=font, fill=(180, 180, 180))
+        draw.text((8, height - 19), footer_text, font=footer_font, fill=(180, 180, 180))
         if gauge.rotation_degrees:
             image = image.rotate(gauge.rotation_degrees)
         gauge.disp.ShowImage(image)
@@ -72,7 +74,7 @@ def draw_scrollable_menu_screen(
         line_text, text_color = line_builder(rows[row_index], row_index, is_selected)
         draw.text((8, y + 2), line_text, font=font, fill=text_color)
 
-    draw.text((8, height - 23), footer_text, font=font, fill=(180, 180, 180))
+    draw.text((8, height - 19), footer_text, font=footer_font, fill=(180, 180, 180))
 
     if gauge.rotation_degrees:
         image = image.rotate(gauge.rotation_degrees)
