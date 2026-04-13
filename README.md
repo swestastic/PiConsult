@@ -1,20 +1,18 @@
-# PiConsult by Swestastic
+# PiConsult
 
 ## Description
 
-This project uses Python to record data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on 1990 NA/MT 300zx and 2001 NA/MT S15 Silvia ECUs. Should support most other similar-era cars, but this has not been tested.
+This project uses Python to read Nissan Consult I data over serial on a Raspberry Pi and then display it on a small SPI display. Tested on 1990 NA/MT 300zx and 2001 NA/MT S15 Silvia ECUs. Should support most other similar-era cars, but this has not been tested.
 
 ## Current Functionality
 
 ### Mode selection menu
-
-![mode select image](images/modeselect.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/modeselect.gif?raw=true" width="50%">
 
 Allows selection of modes between Data Stream, DTC, Active Test, Digital Registers, and Settings. Use Up/Down to navigate and Select to choose an option.
 
 ### Mode 1: Data stream
-
-![gauge image](images/gauge.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/gauge.gif?raw=true" width="50%">
 
 Reads the following data from the ECU and can display live data on the screen. Displayed value changes with button press of Up/Down. Press Select to see the peak value stored during this drive.
 
@@ -43,13 +41,13 @@ Supported parameters:
 
 ### Mode 2: DTCs
 
-![dtc image](images/dtc.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/dtc.gif?raw=true" width="50%">
 
 Reading of Data Trouble Codes (DTCs) and ability to clear stored DTCs. Cycle through stored DTCs with Up/Down. Press Select to clear stored ones.
 
 ### Mode 3: Settings
 
-![settings image](images/settings.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/settings.gif?raw=true" width="50%">
 
 Settings adjustment mode with the following options:
 
@@ -62,7 +60,7 @@ Settings adjustment mode with the following options:
 
 ### Mode 4: Active Test
 
-![active test image](images/activetest.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/activetest.gif?raw=true" width="50%">
 
 Active Testing mode with the following functions:
 
@@ -76,7 +74,7 @@ Active Testing mode with the following functions:
 
 ### Mode 5: Digital Bit Register
 
-![digital bit image](images/digitalbit.gif)
+<img src="https://github.com/swestastic/PiConsult/blob/main/images/digitalbit.gif?raw=true" width="50%">
 
 View binary values in the ECU that tell you when solenoids or other switches are triggered
 
