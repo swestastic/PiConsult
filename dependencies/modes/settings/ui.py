@@ -3,7 +3,7 @@ from typing import Any, Callable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
 
-from dependencies.common.ui import draw_scrollable_menu_screen
+from dependencies.common.ui import draw_scrollable_menu_screen, get_list_body_font
 from dependencies.consult.registers import (
     DEFAULT_READ_PARAMETERS,
     normalize_read_parameters,
@@ -21,6 +21,8 @@ INFO_LINES = [
     "",
     "github.com/swestastic/PiConsult",
 ]
+
+INFO_BODY_FONT_SIZE = 14
 
 
 def build_show_setting_screen_fn(
@@ -103,14 +105,17 @@ def show_info_screen(gauge: Any) -> None:
     draw = ImageDraw.Draw(image)
 
     title = "Info"
-    title_width, _ = gauge._text_size(draw, title, gauge.label_font)
-    draw.text(((width - title_width) // 2, 4), title, font=gauge.label_font, fill=(255, 255, 255))
+    title_font = getattr(gauge, "menu_title_font", None) or getattr(gauge, "label_font", ImageFont.load_default())
+    title_width, title_height = gauge._text_size(draw, title, title_font)
+    title_y = 4
+    draw.text(((width - title_width) // 2, title_y), title, font=title_font, fill=(255, 255, 255))
 
-    body_font = ImageFont.load_default()
+    body_font = get_list_body_font(INFO_BODY_FONT_SIZE)
     line_gap = 4
     line_sizes = [gauge._text_size(draw, line, body_font) for line in INFO_LINES]
     total_height = sum(line_height for _, line_height in line_sizes) + (line_gap * (len(INFO_LINES) - 1))
-    y_cursor = max(32, (height - total_height) // 2)
+    content_top = title_y + title_height + 8
+    y_cursor = max(content_top, (height - total_height) // 2)
 
     for line, (line_width, line_height) in zip(INFO_LINES, line_sizes):
         if not line:
