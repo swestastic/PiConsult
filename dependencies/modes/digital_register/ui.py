@@ -38,14 +38,6 @@ def _digital_bit_name(register: int, bit_index: int) -> str:
     return DIGITAL_BIT_NAME_MAP.get(register, {}).get(bit_index, f"Bit {bit_index}")
 
 
-def _truncate_text(text: str, max_len: int) -> str:
-    if len(text) <= max_len:
-        return text
-    if max_len <= 3:
-        return text[:max_len]
-    return text[: max_len - 3] + "..."
-
-
 def show_digital_bits_screen(state: Any, gauge: Any, selected_registers: list[int]) -> None:
     with state.acquire_lock():
         register_values = dict(state.digital_register_values)
@@ -112,7 +104,7 @@ def show_digital_bits_screen(state: Any, gauge: Any, selected_registers: list[in
 
         draw.rectangle((x, y, x + col_width, y + row_height - 3), fill=bg_color, outline=border_color)
 
-        label = _truncate_text(_digital_bit_name(register, bit_index), 16)
+        label = _digital_bit_name(register, bit_index)
         state_text = "ON" if is_on else "off"
         line = f"{label} {state_text}"
         draw.text((x + 4, y + 4), line, font=body_font, fill=text_color)

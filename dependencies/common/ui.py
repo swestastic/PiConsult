@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+import time
 from typing import Any, Callable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
@@ -63,6 +64,8 @@ def draw_scrollable_menu_screen(
     row_height = max(13, (height - start_y - bottom_margin) // max(1, visible_rows))
     visible_start = max(0, min(selected_index - (visible_rows // 2), max(total_rows - visible_rows, 0)))
     visible_end = min(total_rows, visible_start + visible_rows)
+    now = time.monotonic()
+    menu_key = (title, total_rows, footer_text)
 
     for visible_row, row_index in enumerate(range(visible_start, visible_end)):
         y = start_y + (visible_row * row_height)
@@ -72,7 +75,36 @@ def draw_scrollable_menu_screen(
             draw.rectangle((4, y + 3, width - 4, y + row_height + 1), fill=(24, 36, 52), outline=(90, 140, 190))
 
         line_text, text_color = line_builder(rows[row_index], row_index, is_selected)
-        draw.text((8, y + 2), line_text, font=font, fill=text_color)
+        text_x = 8
+        text_y = y + 2
+        text_width, text_height = gauge._text_size(draw, line_text, font)
+        available_width = max(1, width - 16)
+
+        if is_selected and text_width > available_width:
+            ticker_key = (menu_key, row_index, line_text)
+            last_ticker_key = getattr(gauge, "_menu_ticker_key", None)
+            if ticker_key != last_ticker_key:
+                setattr(gauge, "_menu_ticker_key", ticker_key)
+                setattr(gauge, "_menu_ticker_started", now)
+
+            ticker_started = getattr(gauge, "_menu_ticker_started", now)
+            elapsed = max(0.0, now - ticker_started)
+            pause_seconds = 0.75
+            scroll_speed_px_per_sec = 26.0
+            gap_pixels = 20
+            scroll_cycle = text_width + gap_pixels
+            offset = 0
+            if elapsed > pause_seconds:
+                offset = int(((elapsed - pause_seconds) * scroll_speed_px_per_sec) % max(1, scroll_cycle))
+
+            clip_height = max(text_height + 2, row_height)
+            marquee_layer = Image.new("RGBA", (available_width, clip_height), (0, 0, 0, 0))
+            marquee_draw = ImageDraw.Draw(marquee_layer)
+            marquee_draw.text((-offset, 0), line_text, font=font, fill=text_color)
+            marquee_draw.text((text_width + gap_pixels - offset, 0), line_text, font=font, fill=text_color)
+            image.paste(marquee_layer, (text_x, text_y), marquee_layer)
+        else:
+            draw.text((text_x, text_y), line_text, font=font, fill=text_color)
 
     draw.text((8, height - 19), footer_text, font=footer_font, fill=(180, 180, 180))
 

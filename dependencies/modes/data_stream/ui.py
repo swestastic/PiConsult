@@ -329,24 +329,41 @@ class GaugeNeedleDisplay:
         normalized = " ".join(str(text).split())
         if not normalized:
             return [""]
+        if max_lines <= 0:
+            return []
 
         words = normalized.split(" ")
         lines: list[str] = []
         current = ""
+        truncated = False
 
         def _fits(candidate: str) -> bool:
             width, _ = self._text_size(draw, candidate, font)
             return width <= max_width
 
-        for word in words:
+        def _ellipsize_to_fit(line: str) -> str:
+            if _fits(f"{line}..."):
+                return f"{line}..."
+            trimmed = line
+            while trimmed and not _fits(f"{trimmed}..."):
+                trimmed = trimmed[:-1]
+            return f"{trimmed}..." if trimmed else "..."
+
+        for word_index, word in enumerate(words):
             candidate = word if not current else f"{current} {word}"
             if _fits(candidate):
                 current = candidate
                 continue
 
             if current:
+                if len(lines) >= max_lines:
+                    truncated = True
+                    break
                 lines.append(current)
                 current = ""
+                if len(lines) >= max_lines:
+                    truncated = True
+                    break
 
             if _fits(word):
                 current = word
@@ -356,25 +373,40 @@ class GaugeNeedleDisplay:
             for ch in word:
                 next_chunk = f"{chunk}{ch}"
                 if chunk and not _fits(next_chunk):
+                    if len(lines) >= max_lines:
+                        truncated = True
+                        break
                     lines.append(chunk)
+                    if len(lines) >= max_lines:
+                        truncated = True
+                        break
                     chunk = ch
                 else:
                     chunk = next_chunk
+            if truncated:
+                break
             current = chunk
 
             if len(lines) >= max_lines:
+                truncated = True
                 break
 
-        if current and len(lines) < max_lines:
-            lines.append(current)
+            if word_index < len(words) - 1:
+                continue
+
+        if current:
+            if len(lines) < max_lines:
+                lines.append(current)
+            else:
+                truncated = True
 
         if len(lines) > max_lines:
             lines = lines[:max_lines]
+            truncated = True
 
-        if len(lines) == max_lines and words:
+        if truncated and lines:
             last = lines[-1]
-            if len(last) > 3:
-                lines[-1] = f"{last[:-3]}..."
+            lines[-1] = _ellipsize_to_fit(last)
 
         return lines or [""]
 

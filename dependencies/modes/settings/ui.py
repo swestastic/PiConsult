@@ -64,14 +64,6 @@ def show_settings_list_screen(
     draw_scrollable_menu_screen(gauge, "Settings", setting_text, selected_index, _line_builder, footer)
 
 
-def _truncate_text(text: str, max_length: int) -> str:
-    if len(text) <= max_length:
-        return text
-    if max_length <= 3:
-        return text[:max_length]
-    return text[: max_length - 3] + "..."
-
-
 def show_read_parameters_screen(
     gauge: Any,
     read_parameter_options: Sequence[object],
@@ -86,7 +78,7 @@ def show_read_parameters_screen(
         is_selected = option_code in selected_codes
         pointer = ">" if is_cursor else " "
         check = "[x]" if is_selected else "[ ]"
-        label = _truncate_text(f"0x{option_code:02X} {option_label}", 16)
+        label = f"0x{option_code:02X} {option_label}"
         text_color = (240, 240, 240) if is_cursor else (165, 165, 165)
         return f"{pointer} {check} {label}", text_color
 

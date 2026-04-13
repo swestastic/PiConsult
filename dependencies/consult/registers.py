@@ -37,8 +37,8 @@ READ_PARAMETER_OPTIONS: list[ReadParameterOption] = [
 
     ReadParameterOption(0x1A, "LH AF Alpha", "AF ALPHA", "%"),
     ReadParameterOption(0x1B, "RH AF Alpha", "RH AF ALPHA", "%"),
-    ReadParameterOption(0x1C, "AFAlphaLSelfLear", "AF SLFLRN", "%"),
-    ReadParameterOption(0x1D, "AFAlphaRSelfLear", "RH AF SLFLRN", "%"),
+    ReadParameterOption(0x1C, "LH AF Alpha Self Learn", "AF SLFLRN", "%"),
+    ReadParameterOption(0x1D, "RH AF Alpha Self Learn", "RH AF SLFLRN", "%"),
 
     ReadParameterOption(0x13, "Digital 0x13", "D13", "raw"),
     ReadParameterOption(0x1E, "Digital 0x1E", "D1E", "raw"),
