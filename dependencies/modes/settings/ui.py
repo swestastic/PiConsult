@@ -9,11 +9,11 @@ from dependencies.consult.registers import (
     normalize_read_parameters,
     read_parameter_label,
 )
+from dependencies.config import SOFTWARE_VERSION
 
-APP_VERSION = "V1.0.0"
 INFO_LINES = [
     "PiConsult by Swestastic",
-    f"Software Version: {APP_VERSION}",
+    f"Software Version: {SOFTWARE_VERSION}",
     "",
     "This is free software.",
     "You are free to use, modify, and share it.",

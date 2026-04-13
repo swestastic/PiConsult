@@ -1,33 +1,3 @@
-# /*****************************************************************************
-# * | File        :      config.py
-# * | Author      :   Waveshare team
-# * | Function    :   Hardware underlying interface,for Raspberry pi
-# * | Info        :
-# *----------------
-# * | This version:   V1.0
-# * | Date        :   2020-06-17
-# * | Info        :
-# ******************************************************************************/
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documnetation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to  whom the Software is
-# furished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS OR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-#
-
-
 import time
 import importlib
 
@@ -103,6 +73,8 @@ MENU_TITLE_FONT_SIZE = 24 # Titles atop menus
 GAUGE_RANGE_FONT_SIZE = 18 # Min/Max values on gauge display
 GAUGE_VALUE_FONT_SIZE = 40 # Value text on gauge display
 VALUE_ONLY_FONT_SIZE = 50 # Value text when in "Value Only" display mode
+
+SOFTWARE_VERSION = "1.0.0"
 
 
 class RaspberryPi:
