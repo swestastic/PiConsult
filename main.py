@@ -74,16 +74,14 @@ try:
 except Exception:
     GpioButton = None
 
-try: # try using PiGPIO for better performance, but fall back to default if unavailable
+try:  # Prefer PiGPIO when available, but do not require it.
     from gpiozero import Device as GpioDevice  # type: ignore
     from gpiozero.pins.pigpio import PiGPIOFactory  # type: ignore
-    GpioDevice.pin_factory = PiGPIOFactory() # type: ignore
+
+    GpioDevice.pin_factory = PiGPIOFactory()  # type: ignore
 except Exception:
-    raise RuntimeError(
-        "pigpio is unavailable. Defaulting to gpiozero requested but pigpio is unavailable. "
-        "Install/start pigpio daemon to use pigpio"
-        "`sudo apt install -y pigpio python3-pigpio ; sudo systemctl enable --now pigpiod`"
-    )
+    # Fall back to gpiozero's default pin factory (or LocalButton on desktop).
+    pass
 
 from dependencies.modes.data_stream import GaugeNeedleDisplay, get_stream_range, show_gauge as render_gauge
 from dependencies.common.ui import draw_scrollable_menu_screen
