@@ -4,3 +4,4 @@ numpy
 smbus2
 gpiozero; platform_system == "Linux"
 spidev; platform_system == "Linux"
+pigpio; platform_system == "Linux"

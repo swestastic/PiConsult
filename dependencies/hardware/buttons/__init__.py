@@ -6,8 +6,6 @@ import serial
 
 
 button_event_queue: queue.Queue[str] = queue.Queue()
-_BUTTON_DEBOUNCE_SECONDS = 0.08
-_LAST_BUTTON_EVENT_TIME: dict[str, float] = {}
 
 
 def setup_button_callbacks(mode_button: Any, select_button: Any, up_button: Any, down_button: Any) -> None:
@@ -15,11 +13,6 @@ def setup_button_callbacks(mode_button: Any, select_button: Any, up_button: Any,
 
 	def make_callback(name: str) -> Callable[[], None]:
 		def callback() -> None:
-			now = time.monotonic()
-			last_event_time = _LAST_BUTTON_EVENT_TIME.get(name)
-			if last_event_time is not None and (now - last_event_time) < _BUTTON_DEBOUNCE_SECONDS:
-				return
-			_LAST_BUTTON_EVENT_TIME[name] = now
 			button_event_queue.put(name)
 
 		return callback
