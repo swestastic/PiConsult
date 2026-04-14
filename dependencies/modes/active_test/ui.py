@@ -1,8 +1,8 @@
 import time
 from typing import Any, Callable
 
-from dependencies.common.ui import clamp_int, draw_scrollable_menu_screen
-from dependencies.common.helpers import active_temp_display_value
+from dependencies.common.ui import draw_scrollable_menu_screen
+from dependencies.common.helpers import active_temp_display_value, clamp_int
 
 ACTIVE_TEST_ITEMS = [
     "Coolant Temp",
