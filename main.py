@@ -652,7 +652,7 @@ def ECU_Connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATT
                     flush_input()
             port_obj.write(bytes([0xFF, 0xFF, 0xEF]))
             time.sleep(0.1)
-            response = port_obj.read_all()
+            response = port_obj.read_all() or b""
             if b"\x00\x00\x10" in response:
                 WriteText("Connected", "")
                 return True
