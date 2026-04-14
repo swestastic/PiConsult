@@ -1,11 +1,17 @@
 import os
 import argparse
+import queue
 import time
 import serial
 import threading
 from typing import Optional, Any
 
-from dependencies.hardware.buttons import ButtonContext, process_buttons as process_button_events, setup_button_callbacks
+from dependencies.hardware.buttons import (
+    ButtonContext,
+    button_event_queue,
+    process_buttons as process_button_events,
+    setup_button_callbacks,
+)
 from dependencies.modes.settings import Load_Config, Save_Config
 from dependencies.modes.data_stream import ReadStream, get_stream_value_for_code
 from dependencies.logs import Create_Log_File, WriteLog
@@ -228,6 +234,8 @@ def show_gauge(
 
 DISPLAY_TARGET_FPS = max(1.0, parse_float(os.getenv("CONSULT_DISPLAY_FPS", "30"), 30.0))
 DISPLAY_MIN_DELTA = max(0.0, parse_float(os.getenv("CONSULT_DISPLAY_MIN_DELTA", "0.25"), 0.25))
+PORT_CONNECT_MAX_ATTEMPTS = 5
+ECU_CONNECT_MAX_ATTEMPTS = 5
 
 # Buttons
 ModeButton = Button(MODE_BUTTON_PIN, hold_time=BUTTON_HOLD_TIME_SECONDS, bounce_time=BUTTON_BOUNCE_TIME_SECONDS)
@@ -612,22 +620,29 @@ def pump_local_ui_events() -> bool:
     return True
 
 
-def PortConnect() -> Optional[serial.Serial]:
-    WriteText("Connecting...", "Serial")
-    try:
-        return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)
-        # return serial.Serial("COM6", 9600, timeout=None) # For windows change COM6 to your port
+def PortConnect(max_attempts: int = PORT_CONNECT_MAX_ATTEMPTS) -> Optional[serial.Serial]:
+    attempts = max(1, int(max_attempts))
+    for attempt in range(1, attempts + 1):
+        WriteText("Connecting...", f"Cable {attempt}/{attempts}")
+        try:
+            return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)
+            # return serial.Serial("COM6", 9600, timeout=None) # For windows change COM6 to your port
 
-    except serial.SerialException as exc:
-        WriteLog(Log_Index, exc, "PortConnect - Serial port error")
-        return None
-    except Exception as exc:
-        WriteLog(Log_Index, exc, "PortConnect - Unexpected error")
-        return None
+        except serial.SerialException as exc:
+            WriteLog(Log_Index, exc, "PortConnect - Serial port error")
+        except Exception as exc:
+            WriteLog(Log_Index, exc, "PortConnect - Unexpected error")
+
+        time.sleep(0.35)
+
+    WriteText("Serial Cable", "Not Found")
+    return None
 
 
-def ECU_Connect(port_obj: serial.Serial) -> bool:
-    while True:
+def ECU_Connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATTEMPTS) -> bool:
+    attempts = max(1, int(max_attempts))
+    for attempt in range(1, attempts + 1):
+        WriteText("Connecting...", f"ECU {attempt}/{attempts}")
         try:
             if hasattr(port_obj, "reset_input_buffer"):
                 port_obj.reset_input_buffer()
@@ -637,15 +652,57 @@ def ECU_Connect(port_obj: serial.Serial) -> bool:
                     flush_input()
             port_obj.write(bytes([0xFF, 0xFF, 0xEF]))
             time.sleep(0.1)
-            if port_obj.read_all() == b"\x00\x00\x10":
+            response = port_obj.read_all()
+            if b"\x00\x00\x10" in response:
                 WriteText("Connected", "")
                 return True
         except serial.SerialException as exc:
             WriteLog(Log_Index, exc, "ECU_Connect - Serial port error")
-            time.sleep(0.5)
         except (OSError, TimeoutError) as exc:
             WriteLog(Log_Index, exc, "ECU_Connect - Read/write error")
-            time.sleep(0.5)
+
+        time.sleep(0.35)
+
+    WriteText("ECU Connect", "Failed")
+    return False
+
+
+def _clear_button_event_queue() -> None:
+    while True:
+        try:
+            button_event_queue.get_nowait()
+        except queue.Empty:
+            break
+
+
+def prompt_connect_retry_or_demo(title: str) -> str:
+    _clear_button_event_queue()
+    show_gauge(
+        title,
+        0.0,
+        "Select: Retry",
+        0.0,
+        1.0,
+        show_needle=False,
+        show_dial=False,
+        show_value_text=False,
+        footer_text="Down: Demo Mode",
+    )
+
+    while True:
+        if not pump_local_ui_events():
+            return "exit"
+
+        try:
+            event = button_event_queue.get_nowait()
+        except queue.Empty:
+            time.sleep(0.02)
+            continue
+
+        if event == "select":
+            return "retry"
+        if event == "down":
+            return "demo"
 
 
 R: Optional[Any] = None
@@ -662,17 +719,40 @@ if DEMO_MODE:
     demo_start_time = initialize_demo_mode(WriteText)
     read_thread_active = True
 else:
-    # Connect serial and ECU
-    while PORT is None:
-        PORT = PortConnect()
-        time.sleep(0.1)
+    # Connect serial and ECU, then allow user to choose retry/demo after repeated failures.
+    while True:
+        PORT = PortConnect(max_attempts=PORT_CONNECT_MAX_ATTEMPTS)
+        if PORT is None:
+            retry_action = prompt_connect_retry_or_demo("Cable Not Found")
+            if retry_action == "retry":
+                continue
+            if retry_action == "demo":
+                DEMO_MODE = True
+                demo_start_time = initialize_demo_mode(WriteText)
+                read_thread_active = True
+            break
 
-    ECU_Connected = ECU_Connect(PORT) if PORT is not None else False
+        ecu_connected = ECU_Connect(PORT, max_attempts=ECU_CONNECT_MAX_ATTEMPTS)
+        if ecu_connected:
+            R = ReadStream(port=PORT, daemon=True, settings=Settings)
+            read_thread_active = True
+            break
 
-    # Start background threads
-    if ECU_Connected:
-        R = ReadStream(port=PORT, daemon=True, settings=Settings)
-        read_thread_active = True
+        retry_action = prompt_connect_retry_or_demo("ECU Not Found")
+
+        try:
+            PORT.close()
+        except Exception:
+            pass
+        PORT = None
+
+        if retry_action == "retry":
+            continue
+        if retry_action == "demo":
+            DEMO_MODE = True
+            demo_start_time = initialize_demo_mode(WriteText)
+            read_thread_active = True
+        break
 
 # Main loop
 try:
