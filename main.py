@@ -91,7 +91,7 @@ except Exception:
 
 from dependencies.modes.data_stream import GaugeNeedleDisplay, get_stream_range, show_gauge as render_gauge
 from dependencies.common.ui import draw_scrollable_menu_screen
-from dependencies.common.helpers import speed_unit_label, temp_unit_label
+from dependencies.common.helpers import parse_float, parse_int, speed_unit_label, temp_unit_label
 
 
 def parse_args() -> argparse.Namespace:
@@ -111,20 +111,6 @@ if Button is None:
 
 
 READ_PARAMETER_CODES = [option.code for option in READ_PARAMETER_OPTIONS]
-
-
-def parse_float(value: object, default: float = 0.0) -> float:
-    try:
-        return float(str(value))
-    except (ValueError, TypeError):
-        return default
-
-
-def parse_int(value: object, default: int = 0) -> int:
-    try:
-        return int(float(str(value)))
-    except (ValueError, TypeError, OverflowError):
-        return default
 
 
 def format_stream_value_text(code: int, value: float, unit: str) -> str:

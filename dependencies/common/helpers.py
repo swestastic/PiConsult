@@ -1,6 +1,20 @@
 from typing import Callable
 
 
+def parse_float(value: object, default: float = 0.0) -> float:
+    try:
+        return float(str(value))
+    except (ValueError, TypeError):
+        return default
+
+
+def parse_int(value: object, default: int = 0) -> int:
+    try:
+        return int(float(str(value)))
+    except (ValueError, TypeError, OverflowError):
+        return default
+
+
 def clamp_int(value: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
