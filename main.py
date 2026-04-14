@@ -12,9 +12,9 @@ from dependencies.hardware.buttons import (
     process_buttons as process_button_events,
     setup_button_callbacks,
 )
-from dependencies.modes.settings import Load_Config, Save_Config
+from dependencies.modes.settings import load_config, save_config
 from dependencies.modes.data_stream import ReadStream, get_stream_value_for_code
-from dependencies.logs import Create_Log_File, WriteLog
+from dependencies.logs import create_log_file, write_log
 from dependencies.local_ui import LocalButton, local_ui_requested
 from dependencies.modes.active_test import (
     ACTIVE_TEST_ITEMS,
@@ -115,7 +115,7 @@ def format_stream_value_text(code: int, value: float, unit: str) -> str:
     return f"{value:.2f}"
 
 
-def WriteText(upper: object, lower: object) -> None:
+def write_text(upper: object, lower: object) -> None:
     title = str(upper) if upper is not None else ""
     lower_text = str(lower) if lower is not None else ""
 
@@ -131,7 +131,7 @@ def WriteText(upper: object, lower: object) -> None:
 
 # Load configs
 CONF = os.path.join(os.path.dirname(__file__), "dependencies", "config", "configJSON.json")
-Settings = Load_Config(CONF)
+Settings = load_config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
 Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
 Settings.setdefault("Read_Parameters", list(DEFAULT_READ_PARAMETERS))
@@ -142,12 +142,12 @@ Settings.pop("Gauge_Range_Font_Size", None)
 Settings.pop("Gauge_Value_Font_Size", None)
 Settings.pop("Value_Only_Font_Size", None)
 Settings["Log_Index"] += 1
-Save_Config(CONF, Settings)
-Log_Index = int(Settings["Log_Index"])
-Create_Log_File(Log_Index)
+save_config(CONF, Settings)
+log_index = int(Settings["Log_Index"])
+create_log_file(log_index)
 
-READ_DTC_CODES = build_read_dtc_codes_fn(Log_Index, WriteLog)
-CLEAR_DTC_CODES = build_clear_dtc_codes_fn(Log_Index, WriteLog)
+READ_DTC_CODES = build_read_dtc_codes_fn(log_index, write_log)
+CLEAR_DTC_CODES = build_clear_dtc_codes_fn(log_index, write_log)
 
 Units_Speed = Settings["Units_Speed"]
 Units_Temp = Settings["Units_Temp"]
@@ -439,7 +439,7 @@ settings_callbacks = build_settings_callbacks(
     parse_int,
     parse_float,
     temp_unit_label,
-    Save_Config,
+    save_config,
     CONF,
     update_reader_settings,
 )
@@ -457,7 +457,7 @@ toggle_read_parameter = settings_callbacks["toggle_read_parameter"]
 finalize_read_parameters_update = settings_callbacks["finalize_read_parameters"]
 
 
-def Show_Peak(idx: int) -> None:
+def show_peak(idx: int) -> None:
     with state.acquire_lock():
         state.showing_peak = True
         stream_codes = list(state.stream_display_codes)
@@ -523,8 +523,8 @@ def send_activation_command(
         command_type,
         data_byte,
         demo_mode=demo_mode,
-        log_index=Log_Index,
-        write_log=WriteLog,
+        log_index=log_index,
+        write_log=write_log,
     )
 
 
@@ -538,29 +538,29 @@ def pump_local_ui_events() -> bool:
     return True
 
 
-def PortConnect(max_attempts: int = PORT_CONNECT_MAX_ATTEMPTS) -> Optional[serial.Serial]:
+def port_connect(max_attempts: int = PORT_CONNECT_MAX_ATTEMPTS) -> Optional[serial.Serial]:
     attempts = max(1, int(max_attempts))
     for attempt in range(1, attempts + 1):
-        WriteText("Connecting...", f"Cable {attempt}/{attempts}")
+        write_text("Connecting...", f"Cable {attempt}/{attempts}")
         try:
             return serial.Serial("/dev/ttyUSB0", 9600, timeout=None)
             # return serial.Serial("COM6", 9600, timeout=None) # For windows change COM6 to your port
 
         except serial.SerialException as exc:
-            WriteLog(Log_Index, exc, "PortConnect - Serial port error")
+            write_log(log_index, exc, "PortConnect - Serial port error")
         except Exception as exc:
-            WriteLog(Log_Index, exc, "PortConnect - Unexpected error")
+            write_log(log_index, exc, "PortConnect - Unexpected error")
 
         time.sleep(0.35)
 
-    WriteText("Serial Cable", "Not Found")
+    write_text("Serial Cable", "Not Found")
     return None
 
 
-def ECU_Connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATTEMPTS) -> bool:
+def ecu_connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATTEMPTS) -> bool:
     attempts = max(1, int(max_attempts))
     for attempt in range(1, attempts + 1):
-        WriteText("Connecting...", f"ECU {attempt}/{attempts}")
+        write_text("Connecting...", f"ECU {attempt}/{attempts}")
         try:
             if hasattr(port_obj, "reset_input_buffer"):
                 port_obj.reset_input_buffer()
@@ -572,16 +572,16 @@ def ECU_Connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATT
             time.sleep(0.1)
             response = port_obj.read_all() or b""
             if b"\x00\x00\x10" in response:
-                WriteText("Connected", "")
+                write_text("Connected", "")
                 return True
         except serial.SerialException as exc:
-            WriteLog(Log_Index, exc, "ECU_Connect - Serial port error")
+            write_log(log_index, exc, "ECU_Connect - Serial port error")
         except (OSError, TimeoutError) as exc:
-            WriteLog(Log_Index, exc, "ECU_Connect - Read/write error")
+            write_log(log_index, exc, "ECU_Connect - Read/write error")
 
         time.sleep(0.35)
 
-    WriteText("ECU Connect", "Failed")
+    write_text("ECU Connect", "Failed")
     return False
 
 
@@ -642,23 +642,23 @@ apply_settings_to_runtime()
 setup_button_callbacks(ModeButton, SelectButton, UpButton, DownButton)
 
 if DEMO_MODE:
-    demo_start_time = initialize_demo_mode(WriteText)
+    demo_start_time = initialize_demo_mode(write_text)
     read_thread_active = True
 else:
     # Connect serial and ECU, then allow user to choose retry/demo after repeated failures.
     while True:
-        PORT = PortConnect(max_attempts=PORT_CONNECT_MAX_ATTEMPTS)
+        PORT = port_connect(max_attempts=PORT_CONNECT_MAX_ATTEMPTS)
         if PORT is None:
             retry_action = prompt_connect_retry_or_demo("Cable Not Found")
             if retry_action == "retry":
                 continue
             if retry_action == "demo":
                 DEMO_MODE = True
-                demo_start_time = initialize_demo_mode(WriteText)
+                demo_start_time = initialize_demo_mode(write_text)
                 read_thread_active = True
             break
 
-        ecu_connected = ECU_Connect(PORT, max_attempts=ECU_CONNECT_MAX_ATTEMPTS)
+        ecu_connected = ecu_connect(PORT, max_attempts=ECU_CONNECT_MAX_ATTEMPTS)
         if ecu_connected:
             R = ReadStream(port=PORT, daemon=True, settings=Settings)
             read_thread_active = True
@@ -676,7 +676,7 @@ else:
             continue
         if retry_action == "demo":
             DEMO_MODE = True
-            demo_start_time = initialize_demo_mode(WriteText)
+            demo_start_time = initialize_demo_mode(write_text)
             read_thread_active = True
         break
 
@@ -706,7 +706,7 @@ try:
             digital_bits_mode=DIGITAL_BITS_MODE,
             mode_menu_mode=MODE_MENU,
             mode_menu_targets=MODE_MENU_TARGETS,
-            show_peak_fn=Show_Peak,
+            show_peak_fn=show_peak,
             adjust_setting_value_fn=adjust_setting_value,
             adjust_active_test_value_fn=adjust_active_test_value,
             run_active_test_action_fn=run_active_test_action,

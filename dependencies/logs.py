@@ -28,9 +28,9 @@ def _get_log_path(log_index: Union[int, str]) -> Optional[Path]:
                 return None
 
 
-def Create_Log_File(Log_Index: Union[int, str]) -> str:
+def create_log_file(log_index: Union[int, str]) -> str:
     """Create or initialize a log file. Returns the log path or empty string if logging fails."""
-    log_path = _get_log_path(Log_Index)
+    log_path = _get_log_path(log_index)
     if log_path is None:
         print(f"Warning: Could not create log directory. Logging to console only.")
         return ""
@@ -39,7 +39,7 @@ def Create_Log_File(Log_Index: Union[int, str]) -> str:
         if not log_path.exists():
             log_path.write_text(
                 f"Log file created on {datetime.datetime.now()}\n"
-                f"Log Index: {Log_Index}\n",
+                f"Log Index: {log_index}\n",
                 encoding="utf-8"
             )
         else:
@@ -53,9 +53,9 @@ def Create_Log_File(Log_Index: Union[int, str]) -> str:
         return ""
 
 
-def WriteLog(Log_Index: Union[int, str], exception: object, occurrence: object) -> None:
+def write_log(log_index: Union[int, str], exception: object, occurrence: object) -> None:
     """Write an entry to the log file. Fails silently if logging is not possible."""
-    log_path = _get_log_path(Log_Index)
+    log_path = _get_log_path(log_index)
     if log_path is None:
         return
     

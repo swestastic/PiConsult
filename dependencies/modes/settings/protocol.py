@@ -24,8 +24,8 @@ def _resolve_config_path(file_path: str | os.PathLike[str] | None) -> str:
     return os.path.abspath(os.path.normpath(expanded_path))
 
 
-def Load_Config(FILE: str | os.PathLike[str] | None) -> dict[str, Any]:
-    resolved_file = _resolve_config_path(FILE)
+def load_config(file_path: str | os.PathLike[str] | None) -> dict[str, Any]:
+    resolved_file = _resolve_config_path(file_path)
     try:
         with open(resolved_file, "r", encoding="utf-8") as file:
             return json.load(file)
@@ -44,8 +44,8 @@ def Load_Config(FILE: str | os.PathLike[str] | None) -> dict[str, Any]:
         }
 
 
-def Save_Config(FILE: str | os.PathLike[str] | None, settings: dict[str, Any]) -> None:
-    resolved_file = _resolve_config_path(FILE)
+def save_config(file_path: str | os.PathLike[str] | None, settings: dict[str, Any]) -> None:
+    resolved_file = _resolve_config_path(file_path)
     parent_dir = os.path.dirname(resolved_file)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)

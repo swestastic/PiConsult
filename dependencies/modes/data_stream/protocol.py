@@ -9,7 +9,7 @@ import serial  # type: ignore
 
 from dependencies.consult.protocol import extract_first_consult_frame
 from dependencies.consult.registers import DEFAULT_READ_PARAMETERS, build_stream_request, normalize_read_parameters
-from dependencies.modes.settings import Load_Config
+from dependencies.modes.settings import load_config
 
 
 CONFIG_FILE = str(Path(__file__).resolve().parents[2] / "config" / "configJSON.json")
@@ -124,7 +124,7 @@ class ReadStream(threading.Thread):
         self._last_payload_time = time.monotonic()
         self._last_stream_command_time = 0.0
 
-        initial_settings = settings if isinstance(settings, dict) else Load_Config(CONFIG_FILE)
+        initial_settings = settings if isinstance(settings, dict) else load_config(CONFIG_FILE)
         self.read_parameters = list(DEFAULT_READ_PARAMETERS)
         self._stream_needs_restart = True
         self.update_settings(initial_settings)

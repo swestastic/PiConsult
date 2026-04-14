@@ -1,6 +1,6 @@
 from .protocol import (
-    Load_Config,
-    Save_Config,
+    load_config,
+    save_config,
     adjust_setting_value,
     apply_settings_to_runtime,
     build_settings_callbacks,
@@ -21,8 +21,8 @@ from .ui import (
 )
 
 __all__ = [
-    "Load_Config",
-    "Save_Config",
+    "load_config",
+    "save_config",
     "build_settings_callbacks",
     "show_settings_list_screen",
     "show_read_parameters_screen",
