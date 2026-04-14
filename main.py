@@ -5,7 +5,7 @@ import serial
 import threading
 from typing import Optional, Any
 
-from dependencies.hardware.buttons import process_buttons as process_button_events, setup_button_callbacks
+from dependencies.hardware.buttons import ButtonContext, process_buttons as process_button_events, setup_button_callbacks
 from dependencies.modes.settings import Load_Config, Save_Config
 from dependencies.modes.data_stream import ReadStream, get_stream_value_for_code
 from dependencies.logs import Create_Log_File, WriteLog
@@ -242,7 +242,6 @@ SETTINGS_MODE = 2
 ACTIVE_TEST_MODE = 3
 DIGITAL_BITS_MODE = 4
 MODE_MENU = 5
-MODE_COUNT = 6
 
 MODE_MENU_ITEMS = [
     "Data Stream",
@@ -690,41 +689,37 @@ try:
         if not pump_local_ui_events():
             read_thread_active = False
             break
-        process_button_events(
-            state,
-            PORT,
-            DEMO_MODE,
-            selected_stream_codes,
-            selected_stream_labels,
-            SettingText,
-            READ_PARAMETER_CODES,
-            ACTIVE_TEST_ITEMS,
-            selected_digital_registers,
-            SETTINGS_ADJUSTABLE_INDEXES,
-            DISPLAY_MODE,
-            DTC_MODE,
-            SETTINGS_MODE,
-            ACTIVE_TEST_MODE,
-            DIGITAL_BITS_MODE,
-            MODE_MENU,
-            MODE_MENU_TARGETS,
-            MODE_COUNT,
-            Show_Peak,
-            adjust_setting_value,
-            adjust_active_test_value,
-            run_active_test_action,
-            refresh_dtc_codes_for_buttons,
-            CLEAR_DTC_CODES,
-            send_activation_command,
-            temp_unit_label,
-            READ_DTC_CODES,
-            toggle_speed_units,
-            toggle_temp_units,
-            cycle_default_display,
-            toggle_gauge_display_mode,
-            toggle_read_parameter,
-            finalize_read_parameters_update,
+        button_context = ButtonContext(
+            selected_display_indices=selected_stream_codes,
+            setting_text=SettingText,
+            read_parameter_codes=READ_PARAMETER_CODES,
+            active_test_items=ACTIVE_TEST_ITEMS,
+            selected_digital_registers=selected_digital_registers,
+            settings_adjustable_indexes=SETTINGS_ADJUSTABLE_INDEXES,
+            display_mode=DISPLAY_MODE,
+            dtc_mode=DTC_MODE,
+            settings_mode=SETTINGS_MODE,
+            active_test_mode=ACTIVE_TEST_MODE,
+            digital_bits_mode=DIGITAL_BITS_MODE,
+            mode_menu_mode=MODE_MENU,
+            mode_menu_targets=MODE_MENU_TARGETS,
+            show_peak_fn=Show_Peak,
+            adjust_setting_value_fn=adjust_setting_value,
+            adjust_active_test_value_fn=adjust_active_test_value,
+            run_active_test_action_fn=run_active_test_action,
+            update_dtc_codes_from_ecu_fn=refresh_dtc_codes_for_buttons,
+            clear_dtc_codes_fn=CLEAR_DTC_CODES,
+            send_activation_command_fn=send_activation_command,
+            temp_unit_label_fn=temp_unit_label,
+            read_dtc_codes_fn=READ_DTC_CODES,
+            on_speed_units_toggle_fn=toggle_speed_units,
+            on_temp_units_toggle_fn=toggle_temp_units,
+            on_default_display_cycle_fn=cycle_default_display,
+            on_gauge_display_mode_toggle_fn=toggle_gauge_display_mode,
+            on_read_parameter_toggle_fn=toggle_read_parameter,
+            on_read_parameters_finalize_fn=finalize_read_parameters_update,
         )
+        process_button_events(state, PORT, DEMO_MODE, button_context)
 
         selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
         selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
