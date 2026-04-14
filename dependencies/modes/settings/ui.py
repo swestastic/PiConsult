@@ -1,4 +1,3 @@
-from functools import partial
 from typing import Any, Callable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
@@ -23,27 +22,6 @@ INFO_LINES = [
 ]
 
 INFO_BODY_FONT_SIZE = 14
-
-
-def build_show_setting_screen_fn(
-    state: Any,
-    settings: dict[str, object],
-    setting_text: list[str],
-    settings_adjustable_indexes: set[int],
-    read_parameter_options: Sequence[object],
-    gauge: Any,
-    show_gauge_fn: Callable[..., None],
-) -> Callable[[], None]:
-    return partial(
-        show_setting_screen,
-        state,
-        settings,
-        setting_text,
-        settings_adjustable_indexes,
-        read_parameter_options,
-        gauge,
-        show_gauge_fn,
-    )
 
 
 def show_settings_list_screen(

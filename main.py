@@ -32,17 +32,7 @@ from dependencies.consult.registers import (
     read_parameter_title,
 )
 from dependencies.modes.settings import (
-    build_adjust_setting_value_fn,
-    build_apply_settings_to_runtime_fn,
-    build_cycle_default_display_fn,
-    build_finalize_read_parameters_fn,
-    build_refresh_setting_values_fn,
-    build_refresh_units_fn,
-    build_show_setting_screen_fn,
-    build_toggle_read_parameter_fn,
-    build_toggle_gauge_display_mode_fn,
-    build_toggle_speed_units_fn,
-    build_toggle_temp_units_fn,
+    build_settings_callbacks,
 )
 from dependencies.consult.protocol import (
     send_activation_command as protocol_send_activation_command,
@@ -436,93 +426,35 @@ def update_reader_settings(settings: dict[str, object]) -> None:
         R.update_settings(settings)
 
 
-refresh_setting_values = build_refresh_setting_values_fn(
+settings_callbacks = build_settings_callbacks(
     state,
     Settings,
     DisplayText,
     Units,
-    temp_unit_label,
-    parse_float,
-)
-refresh_units = build_refresh_units_fn(
-    state,
-    Units,
-    refresh_setting_values,
-    temp_unit_label,
-)
-show_setting_screen = build_show_setting_screen_fn(
-    state,
-    Settings,
     SettingText,
     SETTINGS_ADJUSTABLE_INDEXES,
     READ_PARAMETER_OPTIONS,
     gauge,
     show_gauge,
-)
-apply_settings_to_runtime = build_apply_settings_to_runtime_fn(
-    state,
-    Settings,
-    DisplayText,
-    Units,
     parse_int,
     parse_float,
     temp_unit_label,
-    refresh_setting_values,
-)
-adjust_setting_value = build_adjust_setting_value_fn(
-    state,
-    Settings,
-    parse_float,
-    temp_unit_label,
     Save_Config,
     CONF,
     update_reader_settings,
-    refresh_setting_values,
 )
-toggle_speed_units = build_toggle_speed_units_fn(
-    state,
-    Settings,
-    Save_Config,
-    CONF,
-    refresh_units,
-    update_reader_settings,
-)
-toggle_temp_units = build_toggle_temp_units_fn(
-    state,
-    Settings,
-    Save_Config,
-    CONF,
-    refresh_units,
-    update_reader_settings,
-    parse_float,
-)
-cycle_default_display = build_cycle_default_display_fn(
-    state,
-    Settings,
-    DisplayText,
-    Save_Config,
-    CONF,
-)
-toggle_gauge_display_mode = build_toggle_gauge_display_mode_fn(
-    state,
-    Settings,
-    Save_Config,
-    CONF,
-    refresh_setting_values,
-)
-toggle_read_parameter = build_toggle_read_parameter_fn(
-    state,
-    Settings,
-    Save_Config,
-    CONF,
-    refresh_setting_values,
-)
-finalize_read_parameters_update = build_finalize_read_parameters_fn(
-    state,
-    Settings,
-    update_reader_settings,
-    refresh_setting_values,
-)
+
+refresh_setting_values = settings_callbacks["refresh_setting_values"]
+refresh_units = settings_callbacks["refresh_units"]
+show_setting_screen = settings_callbacks["show_setting_screen"]
+apply_settings_to_runtime = settings_callbacks["apply_settings_to_runtime"]
+adjust_setting_value = settings_callbacks["adjust_setting_value"]
+toggle_speed_units = settings_callbacks["toggle_speed_units"]
+toggle_temp_units = settings_callbacks["toggle_temp_units"]
+cycle_default_display = settings_callbacks["cycle_default_display"]
+toggle_gauge_display_mode = settings_callbacks["toggle_gauge_display_mode"]
+toggle_read_parameter = settings_callbacks["toggle_read_parameter"]
+finalize_read_parameters_update = settings_callbacks["finalize_read_parameters"]
 
 
 def Show_Peak(idx: int) -> None:

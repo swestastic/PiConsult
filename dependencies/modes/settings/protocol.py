@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from functools import partial
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 from dependencies.common.helpers import speed_unit_label
 from dependencies.consult.registers import (
@@ -82,154 +82,126 @@ def update_units(
     refresh_settings_fn()
 
 
-def build_refresh_setting_values_fn(
+def _bind(fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Callable[..., Any]:
+    return partial(fn, *args, **kwargs)
+
+
+def build_settings_callbacks(
     state: Any,
     settings: dict[str, object],
     display_text: list[str],
     units: list[str],
-    temp_unit_label_fn: Callable[[object], str],
-    parse_float_fn: Callable[[object, float], float],
-) -> Callable[[], None]:
-    return partial(update_setting_values, state, settings, display_text, units, temp_unit_label_fn, parse_float_fn)
-
-
-def build_refresh_units_fn(
-    state: Any,
-    units: list[str],
-    refresh_settings_fn: Callable[[], None],
-    temp_unit_label_fn: Callable[[object], str],
-) -> Callable[[], None]:
-    return partial(update_units, state, units, refresh_settings_fn, speed_unit_label, temp_unit_label_fn)
-
-
-def build_toggle_read_parameter_fn(
-    state: Any,
-    settings: dict[str, object],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-    update_settings_values_fn: Callable[[], None],
-) -> Callable[[int], None]:
-    return partial(
-        toggle_read_parameter,
-        state,
-        settings,
-        save_config_fn,
-        config_file,
-        update_settings_values_fn,
-    )
-
-
-def build_finalize_read_parameters_fn(
-    state: Any,
-    settings: dict[str, object],
-    update_reader_settings_fn: Callable[[dict[str, object]], None],
-    update_settings_values_fn: Callable[[], None],
-) -> Callable[[], None]:
-    return partial(
-        finalize_read_parameters,
-        state,
-        settings,
-        update_reader_settings_fn,
-        update_settings_values_fn,
-    )
-
-
-def build_apply_settings_to_runtime_fn(
-    state: Any,
-    settings: dict[str, object],
-    display_text: list[str],
-    units: list[str],
+    setting_text: list[str],
+    settings_adjustable_indexes: set[int],
+    read_parameter_options: Sequence[object],
+    gauge: Any,
+    show_gauge_fn: Callable[..., None],
     parse_int_fn: Callable[[object, int], int],
     parse_float_fn: Callable[[object, float], float],
     temp_unit_label_fn: Callable[[object], str],
-    refresh_settings_fn: Callable[[], None],
-) -> Callable[[], None]:
-    return partial(
-        apply_settings_to_runtime,
+    save_config_fn: Callable[[str, dict[str, object]], None],
+    config_file: str,
+    update_reader_settings_fn: Callable[[dict[str, object]], None],
+) -> dict[str, Callable[..., Any]]:
+    from .ui import show_setting_screen
+
+    refresh_setting_values = _bind(
+        update_setting_values,
         state,
         settings,
         display_text,
         units,
-        parse_int_fn,
-        parse_float_fn,
         temp_unit_label_fn,
-        refresh_settings_fn,
-    )
-
-
-def build_adjust_setting_value_fn(
-    state: Any,
-    settings: dict[str, object],
-    parse_float_fn: Callable[[object, float], float],
-    temp_unit_label_fn: Callable[[object], str],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-    update_reader_settings_fn: Callable[[dict[str, object]], None],
-    update_settings_values_fn: Callable[[], None],
-) -> Callable[[int, int], None]:
-    return partial(
-        adjust_setting_value,
-        state,
-        settings,
-        parse_float_fn=parse_float_fn,
-        temp_unit_label_fn=temp_unit_label_fn,
-        save_config_fn=save_config_fn,
-        config_file=config_file,
-        update_reader_settings_fn=update_reader_settings_fn,
-        update_settings_values_fn=update_settings_values_fn,
-    )
-
-
-def build_toggle_speed_units_fn(
-    state: Any,
-    settings: dict[str, object],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-    update_units_fn: Callable[[], None],
-    update_reader_settings_fn: Callable[[dict[str, object]], None],
-) -> Callable[[], None]:
-    return partial(toggle_speed_units, state, settings, save_config_fn, config_file, update_units_fn, update_reader_settings_fn)
-
-
-def build_toggle_temp_units_fn(
-    state: Any,
-    settings: dict[str, object],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-    update_units_fn: Callable[[], None],
-    update_reader_settings_fn: Callable[[dict[str, object]], None],
-    parse_float_fn: Callable[[object, float], float],
-) -> Callable[[], None]:
-    return partial(
-        toggle_temp_units,
-        state,
-        settings,
-        save_config_fn,
-        config_file,
-        update_units_fn,
-        update_reader_settings_fn,
         parse_float_fn,
     )
+    refresh_units = _bind(update_units, state, units, refresh_setting_values, speed_unit_label, temp_unit_label_fn)
 
-
-def build_toggle_gauge_display_mode_fn(
-    state: Any,
-    settings: dict[str, object],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-    update_settings_values_fn: Callable[[], None],
-) -> Callable[[], None]:
-    return partial(toggle_gauge_display_mode, state, settings, save_config_fn, config_file, update_settings_values_fn)
-
-
-def build_cycle_default_display_fn(
-    state: Any,
-    settings: dict[str, object],
-    display_text: list[str],
-    save_config_fn: Callable[[str, dict[str, object]], None],
-    config_file: str,
-) -> Callable[[], None]:
-    return partial(cycle_default_display, state, settings, display_text, save_config_fn, config_file)
+    return {
+        "refresh_setting_values": refresh_setting_values,
+        "refresh_units": refresh_units,
+        "show_setting_screen": _bind(
+            show_setting_screen,
+            state,
+            settings,
+            setting_text,
+            settings_adjustable_indexes,
+            read_parameter_options,
+            gauge,
+            show_gauge_fn,
+        ),
+        "apply_settings_to_runtime": _bind(
+            apply_settings_to_runtime,
+            state,
+            settings,
+            display_text,
+            units,
+            parse_int_fn,
+            parse_float_fn,
+            temp_unit_label_fn,
+            refresh_setting_values,
+        ),
+        "adjust_setting_value": _bind(
+            adjust_setting_value,
+            state,
+            settings,
+            parse_float_fn=parse_float_fn,
+            temp_unit_label_fn=temp_unit_label_fn,
+            save_config_fn=save_config_fn,
+            config_file=config_file,
+            update_reader_settings_fn=update_reader_settings_fn,
+            update_settings_values_fn=refresh_setting_values,
+        ),
+        "toggle_speed_units": _bind(
+            toggle_speed_units,
+            state,
+            settings,
+            save_config_fn,
+            config_file,
+            refresh_units,
+            update_reader_settings_fn,
+        ),
+        "toggle_temp_units": _bind(
+            toggle_temp_units,
+            state,
+            settings,
+            save_config_fn,
+            config_file,
+            refresh_units,
+            update_reader_settings_fn,
+            parse_float_fn,
+        ),
+        "cycle_default_display": _bind(
+            cycle_default_display,
+            state,
+            settings,
+            display_text,
+            save_config_fn,
+            config_file,
+        ),
+        "toggle_gauge_display_mode": _bind(
+            toggle_gauge_display_mode,
+            state,
+            settings,
+            save_config_fn,
+            config_file,
+            refresh_setting_values,
+        ),
+        "toggle_read_parameter": _bind(
+            toggle_read_parameter,
+            state,
+            settings,
+            save_config_fn,
+            config_file,
+            refresh_setting_values,
+        ),
+        "finalize_read_parameters": _bind(
+            finalize_read_parameters,
+            state,
+            settings,
+            update_reader_settings_fn,
+            refresh_setting_values,
+        ),
+    }
 
 
 def update_setting_values(
