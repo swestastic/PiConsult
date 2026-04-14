@@ -1,6 +1,7 @@
 import time
 from functools import partial
 from typing import Any, Callable, Optional
+from dependencies.consult.protocol import extract_first_consult_frame
 
 import serial
 
@@ -60,24 +61,6 @@ DTC_CODE_TITLES = {
 }
 
 
-def _extract_first_consult_frame(raw_bytes: bytes) -> Optional[bytes]:
-    if not raw_bytes:
-        return None
-
-    data = list(raw_bytes)
-    for i, value in enumerate(data):
-        if value != 0xFF:
-            continue
-        if i + 1 >= len(data):
-            return None
-        payload_len = int(data[i + 1])
-        frame_end = i + 2 + payload_len
-        if frame_end <= len(data):
-            return bytes(data[i + 2:frame_end])
-        return None
-    return None
-
-
 def read_dtc_codes(
     port_obj: serial.Serial,
     *,
@@ -98,7 +81,7 @@ def read_dtc_codes(
             chunk = port_obj.read_all()
             if chunk:
                 buffer.extend(chunk)
-                payload = _extract_first_consult_frame(bytes(buffer))
+                payload = extract_first_consult_frame(bytes(buffer))
                 if payload is not None:
                     break
             time.sleep(0.01)
