@@ -705,6 +705,14 @@ def prompt_connect_retry_or_demo(title: str) -> str:
             return "demo"
 
 
+def _get_selected_parameters() -> tuple[list[int], list[str], list[int]]:
+    selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
+    selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
+    selected_stream_labels = [read_parameter_label(code) for code in selected_stream_codes]
+    selected_digital_registers = get_selected_digital_registers(selected_read_parameters)
+    return selected_stream_codes, selected_stream_labels, selected_digital_registers
+
+
 R: Optional[Any] = None
 PORT: Optional[serial.Serial] = None
 demo_start_time = 0.0
@@ -756,12 +764,9 @@ else:
 
 # Main loop
 try:
-    while read_thread_active:
-        selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
-        selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
-        selected_stream_labels = [read_parameter_label(code) for code in selected_stream_codes]
-        selected_digital_registers = get_selected_digital_registers(selected_read_parameters)
+    selected_stream_codes, selected_stream_labels, selected_digital_registers = _get_selected_parameters()
 
+    while read_thread_active:
         with state.acquire_lock():
             state.stream_display_codes = list(selected_stream_codes)
             state.stream_display_labels = list(selected_stream_labels)
@@ -799,12 +804,10 @@ try:
             on_read_parameter_toggle_fn=toggle_read_parameter,
             on_read_parameters_finalize_fn=finalize_read_parameters_update,
         )
-        process_button_events(state, PORT, DEMO_MODE, button_context)
-
-        selected_read_parameters = Settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS)
-        selected_stream_codes = get_selected_stream_codes(selected_read_parameters)
-        selected_stream_labels = [read_parameter_label(code) for code in selected_stream_codes]
-        selected_digital_registers = get_selected_digital_registers(selected_read_parameters)
+        had_button_events = not button_event_queue.empty()
+        if had_button_events:
+            process_button_events(state, PORT, DEMO_MODE, button_context)
+            selected_stream_codes, selected_stream_labels, selected_digital_registers = _get_selected_parameters()
 
         with state.acquire_lock():
             state.stream_display_codes = list(selected_stream_codes)
