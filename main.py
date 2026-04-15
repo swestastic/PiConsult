@@ -14,7 +14,7 @@ from dependencies.hardware.buttons import (
 )
 from dependencies.modes.settings import load_config, save_config
 from dependencies.modes.data_stream import ReadStream, get_stream_value_for_code
-from dependencies.logs import create_log_file, write_log
+from dependencies.logs import create_log_file, get_log_level, log_command, log_message, set_log_level, write_log
 from dependencies.local_ui import LocalButton, local_ui_requested
 from dependencies.modes.active_test import (
     ACTIVE_TEST_ITEMS,
@@ -23,11 +23,13 @@ from dependencies.modes.active_test import (
     show_active_test_screen,
 )
 from dependencies.consult.registers import (
+    build_stream_request,
     DEFAULT_READ_PARAMETERS,
     READ_PARAMETER_OPTIONS,
     get_selected_digital_registers,
     get_selected_stream_codes,
     get_stream_unit,
+    normalize_read_parameters,
     read_parameter_label,
     read_parameter_title,
 )
@@ -44,8 +46,7 @@ from dependencies.modes.digital_register import (
 )
 from dependencies.modes.dtc import (
     DTC_CODE_TITLES,
-    build_clear_dtc_codes_fn,
-    build_read_dtc_codes_fn,
+    build_dtc_callbacks,
     refresh_dtc_codes_for_buttons,
     show_dtc_screen,
 )
@@ -135,6 +136,7 @@ Settings = load_config(CONF)
 Settings.setdefault("Speed_Correction", 1.0)
 Settings.setdefault("Gauge_Display_Mode", "Gauge + Value")
 Settings.setdefault("Read_Parameters", list(DEFAULT_READ_PARAMETERS))
+Settings.setdefault("Log_Level", "critical")
 Settings.pop("Footer_Font_Size", None)
 Settings.pop("Menu_Font_Size", None)
 Settings.pop("Menu_Title_Font_Size", None)
@@ -144,10 +146,12 @@ Settings.pop("Value_Only_Font_Size", None)
 Settings["Log_Index"] += 1
 save_config(CONF, Settings)
 log_index = int(Settings["Log_Index"])
-create_log_file(log_index)
+set_log_level(Settings.get("Log_Level", "critical"))
+create_log_file(log_index, get_log_level())
 
-READ_DTC_CODES = build_read_dtc_codes_fn(log_index, write_log)
-CLEAR_DTC_CODES = build_clear_dtc_codes_fn(log_index, write_log)
+dtc_callbacks = build_dtc_callbacks(log_index, write_log)
+READ_DTC_CODES = dtc_callbacks["read_dtc_codes"]
+CLEAR_DTC_CODES = dtc_callbacks["clear_dtc_codes"]
 
 Units_Speed = Settings["Units_Speed"]
 Units_Temp = Settings["Units_Temp"]
@@ -260,6 +264,7 @@ SettingText = [
     "Temp Units",
     "Speed Correction",
     "Gauge Display Mode",
+    "Log Level",
     "Default Display",
     "RPM Warning",
     "Coolant Warning",
@@ -271,11 +276,12 @@ SETTING_SPEED_UNITS = 0
 SETTING_TEMP_UNITS = 1
 SETTING_SPEED_CORRECTION = 2
 SETTING_GAUGE_DISPLAY_MODE = 3
-SETTING_DEFAULT_DISPLAY = 4
-SETTING_RPM_WARNING = 5
-SETTING_COOLANT_WARNING = 6
-SETTING_READ_PARAMETERS = 7
-SETTING_INFO = 8
+SETTING_LOG_LEVEL = 4
+SETTING_DEFAULT_DISPLAY = 5
+SETTING_RPM_WARNING = 6
+SETTING_COOLANT_WARNING = 7
+SETTING_READ_PARAMETERS = 8
+SETTING_INFO = 9
 SETTINGS_ADJUSTABLE_INDEXES = {
     SETTING_SPEED_CORRECTION,
     SETTING_RPM_WARNING,
@@ -286,7 +292,7 @@ class AppState:
     """Thread-safe application state manager. All mutable state is protected by a lock."""
 
     def __init__(self, default_display: int, units_speed: object, units_temp: object,
-                 rpm_warning: float, coolant_warning: float) -> None:
+                 rpm_warning: float, coolant_warning: float, log_level: object) -> None:
         self._lock = threading.Lock()
         
         # Display and UI state
@@ -300,6 +306,7 @@ class AppState:
         self.default_display = default_display
         self.speed_correction = Speed_Correction
         self.gauge_display_mode = Gauge_Display_Mode
+        self.log_level = str(log_level)
         self.rpm_warning = rpm_warning
         self.coolant_warning = coolant_warning
         
@@ -320,6 +327,7 @@ class AppState:
             temp_unit_label(units_temp),
             f"{Speed_Correction:.2f}",
             Gauge_Display_Mode,
+            str(log_level).capitalize(),
             DisplayText[safe_display_idx],
             f"{int(round(rpm_warning))} RPM",
             f"{int(round(coolant_warning))} {temp_unit_label(units_temp)}",
@@ -418,12 +426,33 @@ state = AppState(
     units_temp=Units_Temp,
     rpm_warning=RPM_Warning,
     coolant_warning=Coolant_Warning,
+    log_level=Settings.get("Log_Level", "critical"),
 )
+
+
+_last_demo_stream_command: Optional[bytes] = None
+
+
+def _log_demo_stream_init_command(settings_obj: dict[str, object], reason: str, *, force: bool = False) -> None:
+    global _last_demo_stream_command
+    if not DEMO_MODE:
+        return
+
+    selected_codes = normalize_read_parameters(settings_obj.get("Read_Parameters", DEFAULT_READ_PARAMETERS))
+    command = build_stream_request(selected_codes)
+    if not force and _last_demo_stream_command == command:
+        return
+
+    _last_demo_stream_command = command
+    log_command(log_index, f"Start stream ({reason})", command, demo_mode=True)
 
 
 def update_reader_settings(settings: dict[str, object]) -> None:
     if R is not None:
         R.update_settings(settings)
+        return
+
+    _log_demo_stream_init_command(settings, "settings update")
 
 
 settings_callbacks = build_settings_callbacks(
@@ -453,6 +482,7 @@ toggle_speed_units = settings_callbacks["toggle_speed_units"]
 toggle_temp_units = settings_callbacks["toggle_temp_units"]
 cycle_default_display = settings_callbacks["cycle_default_display"]
 toggle_gauge_display_mode = settings_callbacks["toggle_gauge_display_mode"]
+toggle_log_level = settings_callbacks["toggle_log_level"]
 toggle_read_parameter = settings_callbacks["toggle_read_parameter"]
 finalize_read_parameters_update = settings_callbacks["finalize_read_parameters"]
 
@@ -568,10 +598,12 @@ def ecu_connect(port_obj: serial.Serial, max_attempts: int = ECU_CONNECT_MAX_ATT
                 flush_input = getattr(port_obj, "flushInput", None)
                 if callable(flush_input):
                     flush_input()
-            port_obj.write(bytes([0xFF, 0xFF, 0xEF]))
+            handshake_command = bytes([0xFF, 0xFF, 0xEF])
+            log_command(log_index, "ECU handshake", handshake_command)
+            port_obj.write(handshake_command)
             time.sleep(0.1)
             response = port_obj.read_all() or b""
-            if b"\x00\x00\x10" in response:
+            if b"\x10" in response:
                 write_text("Connected", "")
                 return True
         except serial.SerialException as exc:
@@ -642,6 +674,8 @@ apply_settings_to_runtime()
 setup_button_callbacks(ModeButton, SelectButton, UpButton, DownButton)
 
 if DEMO_MODE:
+    log_message(log_index, "Startup", "DEMO MODE active - ECU writes are simulated", level="verbose")
+    _log_demo_stream_init_command(Settings, "boot", force=True)
     demo_start_time = initialize_demo_mode(write_text)
     read_thread_active = True
 else:
@@ -654,13 +688,14 @@ else:
                 continue
             if retry_action == "demo":
                 DEMO_MODE = True
+                _log_demo_stream_init_command(Settings, "boot", force=True)
                 demo_start_time = initialize_demo_mode(write_text)
                 read_thread_active = True
             break
 
         ecu_connected = ecu_connect(PORT, max_attempts=ECU_CONNECT_MAX_ATTEMPTS)
         if ecu_connected:
-            R = ReadStream(port=PORT, daemon=True, settings=Settings)
+            R = ReadStream(port=PORT, daemon=True, settings=Settings, log_index=log_index)
             read_thread_active = True
             break
 
@@ -676,6 +711,7 @@ else:
             continue
         if retry_action == "demo":
             DEMO_MODE = True
+            _log_demo_stream_init_command(Settings, "boot", force=True)
             demo_start_time = initialize_demo_mode(write_text)
             read_thread_active = True
         break
@@ -719,6 +755,7 @@ try:
             on_temp_units_toggle_fn=toggle_temp_units,
             on_default_display_cycle_fn=cycle_default_display,
             on_gauge_display_mode_toggle_fn=toggle_gauge_display_mode,
+            on_log_level_toggle_fn=toggle_log_level,
             on_read_parameter_toggle_fn=toggle_read_parameter,
             on_read_parameters_finalize_fn=finalize_read_parameters_update,
         )

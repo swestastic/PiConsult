@@ -1,7 +1,6 @@
 from .protocol import (
     DTC_CODE_TITLES,
-    build_clear_dtc_codes_fn,
-    build_read_dtc_codes_fn,
+    build_dtc_callbacks,
     clear_dtc_codes,
     read_dtc_codes,
     refresh_dtc_codes_for_buttons,
@@ -16,6 +15,5 @@ __all__ = [
     "refresh_dtc_codes_for_buttons",
     "read_dtc_codes",
     "clear_dtc_codes",
-    "build_read_dtc_codes_fn",
-    "build_clear_dtc_codes_fn",
+    "build_dtc_callbacks",
 ]

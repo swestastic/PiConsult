@@ -7,6 +7,7 @@ from .protocol import (
     cycle_default_display,
     finalize_read_parameters,
     normalize_gauge_display_mode,
+    toggle_log_level,
     toggle_gauge_display_mode,
     toggle_read_parameter,
     toggle_speed_units,
@@ -38,4 +39,5 @@ __all__ = [
     "cycle_default_display",
     "normalize_gauge_display_mode",
     "toggle_gauge_display_mode",
+    "toggle_log_level",
 ]

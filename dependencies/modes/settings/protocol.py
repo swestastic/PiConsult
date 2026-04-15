@@ -15,6 +15,7 @@ from dependencies.consult.registers import (
     read_parameter_summary,
     read_parameter_title,
 )
+from dependencies.logs import normalize_log_level, set_log_level
 
 
 def _resolve_config_path(file_path: str | os.PathLike[str] | None) -> str:
@@ -36,6 +37,7 @@ def load_config(file_path: str | os.PathLike[str] | None) -> dict[str, Any]:
             "Units_Temp": "F",
             "Speed_Correction": 1.0,
             "Gauge_Display_Mode": "Gauge + Value",
+            "Log_Level": "critical",
             "Default_Display": 0,
             "Coolant_Warning": 200,
             "RPM_Warning": 7000,
@@ -186,6 +188,14 @@ def build_settings_callbacks(
             config_file,
             refresh_setting_values,
         ),
+        "toggle_log_level": _bind(
+            toggle_log_level,
+            state,
+            settings,
+            save_config_fn,
+            config_file,
+            refresh_setting_values,
+        ),
         "toggle_read_parameter": _bind(
             toggle_read_parameter,
             state,
@@ -220,18 +230,19 @@ def update_setting_values(
         state.setting_values[1] = units[4]
         state.setting_values[2] = f"{state.speed_correction:.2f}"
         state.setting_values[3] = normalize_gauge_display_mode(state.gauge_display_mode)
+        state.setting_values[4] = str(getattr(state, "log_level", "critical")).capitalize()
         if selected_stream_titles:
             state.default_display = state.default_display % len(selected_stream_titles)
-            state.setting_values[4] = selected_stream_titles[state.default_display]
+            state.setting_values[5] = selected_stream_titles[state.default_display]
         else:
             state.default_display = 0
-            state.setting_values[4] = "None"
-        state.setting_values[5] = f"{int(round(state.rpm_warning))} RPM"
-        state.setting_values[6] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
-        if len(state.setting_values) > 7:
-            state.setting_values[7] = read_parameter_summary(settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS))
+            state.setting_values[5] = "None"
+        state.setting_values[6] = f"{int(round(state.rpm_warning))} RPM"
+        state.setting_values[7] = f"{int(round(state.coolant_warning))} {temp_unit_label_fn(state.units_temp)}"
         if len(state.setting_values) > 8:
-            state.setting_values[8] = "About"
+            state.setting_values[8] = read_parameter_summary(settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS))
+        if len(state.setting_values) > 9:
+            state.setting_values[9] = "About"
 
 
 def apply_settings_to_runtime(
@@ -248,6 +259,8 @@ def apply_settings_to_runtime(
     state.units_temp = settings.get("Units_Temp", state.units_temp)
     state.speed_correction = parse_float_fn(settings.get("Speed_Correction", state.speed_correction), state.speed_correction)
     state.gauge_display_mode = normalize_gauge_display_mode(settings.get("Gauge_Display_Mode", state.gauge_display_mode))
+    state.log_level = normalize_log_level(settings.get("Log_Level", getattr(state, "log_level", "critical")))
+    set_log_level(state.log_level)
 
     selected_stream_codes = get_selected_stream_codes(settings.get("Read_Parameters", DEFAULT_READ_PARAMETERS))
     default_count = max(1, len(selected_stream_codes))
@@ -357,6 +370,8 @@ def adjust_setting_value(
     update_settings_values_fn()
 
 
+
+
 def toggle_speed_units(
     state: Any,
     settings: dict[str, object],
@@ -457,5 +472,25 @@ def toggle_gauge_display_mode(
     with state.acquire_lock():
         state.gauge_display_mode = new_mode
     settings["Gauge_Display_Mode"] = new_mode
+    save_config_fn(config_file, settings)
+    update_settings_values_fn()
+
+
+def toggle_log_level(
+    state: Any,
+    settings: dict[str, object],
+    save_config_fn: Callable[[str, dict[str, object]], None],
+    config_file: str,
+    update_settings_values_fn: Callable[[], None],
+) -> None:
+    levels = ["quiet", "critical", "verbose"]
+    with state.acquire_lock():
+        current_level = normalize_log_level(getattr(state, "log_level", "critical"))
+        current_index = levels.index(current_level)
+        new_level = levels[(current_index + 1) % len(levels)]
+        state.log_level = new_level
+
+    settings["Log_Level"] = new_level
+    set_log_level(new_level)
     save_config_fn(config_file, settings)
     update_settings_values_fn()

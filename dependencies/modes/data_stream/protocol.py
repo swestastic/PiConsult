@@ -9,6 +9,7 @@ import serial  # type: ignore
 
 from dependencies.consult.protocol import extract_first_consult_frame
 from dependencies.consult.registers import DEFAULT_READ_PARAMETERS, build_stream_request, normalize_read_parameters
+from dependencies.logs import log_command
 from dependencies.modes.settings import load_config
 
 
@@ -85,10 +86,11 @@ def get_stream_value_for_code(
 
 
 class ReadStream(threading.Thread):
-    def __init__(self, port, daemon, settings=None):
+    def __init__(self, port, daemon, settings=None, log_index: int = 0):
         threading.Thread.__init__(self)
         self.daemon = daemon
         self.port = port
+        self.log_index = int(log_index)
         self._settings_lock = threading.Lock()
 
         self.RPM_Value = 0
@@ -178,6 +180,7 @@ class ReadStream(threading.Thread):
         try:
             if hasattr(self.port, "reset_input_buffer"):
                 self.port.reset_input_buffer()
+            log_command(self.log_index, "Start stream", self._stream_command)
             self.port.write(self._stream_command)
             return True
         except (serial.SerialException, OSError, ValueError):
@@ -185,7 +188,9 @@ class ReadStream(threading.Thread):
 
     def _stop_stream_command(self) -> bool:
         try:
-            self.port.write(bytes([0x30]))
+            command = bytes([0x30])
+            log_command(self.log_index, "Stop stream", command)
+            self.port.write(command)
             if hasattr(self.port, "reset_input_buffer"):
                 self.port.reset_input_buffer()
             return True

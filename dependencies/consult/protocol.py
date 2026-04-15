@@ -3,6 +3,8 @@ from typing import Callable, Optional
 
 import serial
 
+from dependencies.logs import log_command
+
 
 def extract_first_consult_frame(raw_bytes: bytes) -> Optional[bytes]:
     """Extract first consult frame payload: 0xFF, <len>, <payload...>."""
@@ -33,14 +35,18 @@ def send_activation_command(
     write_log: Callable[[int, object, str], None],
 ) -> bool:
     """Send consult active test command: 0x0A <type> <data> 0xF0."""
+    command = bytes([0x0A, command_type & 0xFF, data_byte & 0xFF, 0xF0])
+
     if demo_mode:
+        log_command(log_index, f"Active test command 0x{command_type:02X}", command, demo_mode=True)
         return True
 
     if port_obj is None:
         return False
 
     try:
-        port_obj.write(bytes([0x0A, command_type & 0xFF, data_byte & 0xFF, 0xF0]))
+        log_command(log_index, f"Active test command 0x{command_type:02X}", command)
+        port_obj.write(command)
         time.sleep(0.05)
         return True
     except (serial.SerialException, OSError, ValueError) as exc:

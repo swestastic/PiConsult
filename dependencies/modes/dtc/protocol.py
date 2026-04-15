@@ -1,7 +1,7 @@
 import time
-from functools import partial
 from typing import Any, Callable, Optional
 from dependencies.consult.protocol import extract_first_consult_frame
+from dependencies.logs import log_command
 
 import serial
 
@@ -72,7 +72,9 @@ def read_dtc_codes(
         if hasattr(port_obj, "reset_input_buffer"):
             port_obj.reset_input_buffer()
 
-        port_obj.write(bytes([0xD1, 0xF0]))
+        read_command = bytes([0xD1, 0xF0])
+        log_command(log_index, "Read DTC codes", read_command)
+        port_obj.write(read_command)
         deadline = time.monotonic() + timeout_seconds
         buffer = bytearray()
         payload = None
@@ -86,7 +88,9 @@ def read_dtc_codes(
                     break
             time.sleep(0.01)
 
-        port_obj.write(bytes([0x30]))
+        stop_command = bytes([0x30])
+        log_command(log_index, "Stop DTC read", stop_command)
+        port_obj.write(stop_command)
 
         if payload is None:
             return []
@@ -110,7 +114,10 @@ def clear_dtc_codes(
     log_index: int,
     write_log: Callable[[int, object, str], None],
 ) -> bool:
+    clear_command = bytes([0xC1])
+
     if demo_mode:
+        log_command(log_index, "Clear DTC codes", clear_command, demo_mode=True)
         return True
 
     if port_obj is None:
@@ -120,7 +127,8 @@ def clear_dtc_codes(
         if hasattr(port_obj, "reset_input_buffer"):
             port_obj.reset_input_buffer()
 
-        port_obj.write(bytes([0xC1]))
+        log_command(log_index, "Clear DTC codes", clear_command)
+        port_obj.write(clear_command)
         time.sleep(0.15)
         return True
     except (serial.SerialException, OSError, ValueError) as exc:
@@ -128,12 +136,32 @@ def clear_dtc_codes(
         return False
 
 
-def build_read_dtc_codes_fn(log_index: int, write_log: Callable[[int, object, str], None]) -> Callable[[serial.Serial], list[int]]:
-    return partial(read_dtc_codes, timeout_seconds=1.0, log_index=log_index, write_log=write_log)
+def build_dtc_callbacks(
+    log_index: int,
+    write_log: Callable[[int, object, str], None],
+) -> dict[str, Callable[..., Any]]:
+    def _read(port_obj: serial.Serial) -> list[int]:
+        return read_dtc_codes(
+            port_obj,
+            timeout_seconds=1.0,
+            log_index=log_index,
+            write_log=write_log,
+        )
 
+    def _clear(port_obj: Optional[serial.Serial], demo_mode: bool) -> bool:
+        return clear_dtc_codes(
+            port_obj,
+            demo_mode=demo_mode,
+            log_index=log_index,
+            write_log=write_log,
+        )
 
-def build_clear_dtc_codes_fn(log_index: int, write_log: Callable[[int, object, str], None]) -> Callable[[Optional[serial.Serial], bool], bool]:
-    return partial(clear_dtc_codes, log_index=log_index, write_log=write_log)
+    setattr(_read, "log_index", int(log_index))
+
+    return {
+        "read_dtc_codes": _read,
+        "clear_dtc_codes": _clear,
+    }
 
 
 def update_dtc_codes_from_ecu(
@@ -144,6 +172,9 @@ def update_dtc_codes_from_ecu(
     read_dtc_codes_fn: Callable[[serial.Serial], list[int]],
 ) -> None:
     if demo_mode:
+        demo_log_index = int(getattr(read_dtc_codes_fn, "log_index", 0))
+        log_command(demo_log_index, "Read DTC codes", bytes([0xD1, 0xF0]), demo_mode=True)
+        log_command(demo_log_index, "Stop DTC read", bytes([0x30]), demo_mode=True)
         sample_codes = [13, 34, 43]
         with state.acquire_lock():
             state.dtc_codes = sample_codes

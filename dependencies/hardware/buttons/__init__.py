@@ -37,6 +37,7 @@ class ButtonContext:
 	on_temp_units_toggle_fn: Callable[[], None]
 	on_default_display_cycle_fn: Callable[[], None]
 	on_gauge_display_mode_toggle_fn: Callable[[], None]
+	on_log_level_toggle_fn: Callable[[], None]
 	on_read_parameter_toggle_fn: Callable[[int], None]
 	on_read_parameters_finalize_fn: Callable[[], None]
 
@@ -248,6 +249,9 @@ def _handle_select_event(
 			return
 		if ctx.setting_text[setting_index] == "Gauge Display Mode":
 			ctx.on_gauge_display_mode_toggle_fn()
+			return
+		if ctx.setting_text[setting_index] == "Log Level":
+			ctx.on_log_level_toggle_fn()
 			return
 		if ctx.setting_text[setting_index] == "Default Display":
 			ctx.on_default_display_cycle_fn()
